@@ -11,6 +11,8 @@
 - [x] Deteccion de instancia unica
 - [x] Documentacion (README, CHANGELOG, TODO)
 - [x] `requirements.txt`
+- [x] `.gitignore`
+- [x] Repo publico GitHub (GexStudio-Team/jarvis-launcher)
 
 ## Pendiente
 

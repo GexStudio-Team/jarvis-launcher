@@ -6,6 +6,15 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/).
 
 ---
 
+## [1.0.1] - 2026-09-09 (America/Bogota)
+
+### Added
+- `.gitignore` para excluir `__pycache__`, entornos virtuales y archivos de IDE
+- Repositorio publico: https://github.com/GexStudio-Team/jarvis-launcher
+- Proyecto movido a `Documents/Proyectos/GexClub/proyectos/jarvis-launcher`
+
+---
+
 ## [1.0.0] - 2026-09-09 (America/Bogota)
 
 ### Added
