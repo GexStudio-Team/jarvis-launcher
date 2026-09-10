@@ -22,6 +22,12 @@
 - [x] Animacion de seleccion con flash de color del modo
 - [x] Notificaciones Windows al completar lanzamiento
 - [x] soporte multi-monitor
+- [x] Fix v1.2.0: eliminar QGraphicsEffect (spam QPainter + cards negras en hover)
+- [x] Fix v1.2.0: sonidos con winsound.Beep (ya no dependen del esquema de Windows)
+- [x] Fix v1.2.0: resolucion robusta de rutas de apps (PATH, menu inicio, App Paths)
+- [x] v1.2.0: beam de energia a la card seleccionada
+- [x] v1.2.0: corner brackets HUD en tarjetas + halo de hover manual
+- [x] v1.2.0: boot rediseñado con barra de progreso
 
 ## Pendiente
 
@@ -29,3 +35,4 @@
 - [ ] Editor grafico de modos (GUI para agregar/quitar apps)
 - [ ] Scripts predefinidos para mas modos (Docker, Streaming, etc.)
 - [ ] Sonido en hover de tarjetas
+- [ ] Probar en la maquina real: instalar Discord y Spotify para validar resolucion por nombre

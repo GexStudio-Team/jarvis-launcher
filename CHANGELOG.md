@@ -6,7 +6,27 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/).
 
 ---
 
-## [1.1.0] - 2026-09-09 (America/Bogota)
+## [1.2.0] - 2026-09-10 (America/Bogota)
+
+### Fixed
+- Conflictos de QPainter (`paint device can only be painted by one painter`): se eliminaron todos los `QGraphicsEffect` (opacity en la ventana, drop shadow en las tarjetas) que, combinados con `paintEvent` custom, generaban spam de errores y tarjetas pintadas en negro al hacer hover en Qt6
+- Fade-in de la ventana ahora usa la propiedad nativa `windowOpacity` en lugar de `QGraphicsOpacityEffect`
+- Overlays (boot y flash) ahora animan su opacidad con propiedades propias (`fade`/`alpha`) y repintado manual
+- Sonidos de feedback: reemplazado `PlaySound(SND_ALIAS)` (dependia del esquema de sonido de Windows) por `winsound.Beep` con frecuencias reales en hilos daemon
+- `core/launcher.py`: resolucion robusta de rutas de apps (PATH, menu de inicio `.lnk` via COM y registro App Paths); mensaje claro cuando la app no esta instalada
+- `config.json`: las apps Discord y Spotify ahora usan nombre corto (`"Discord"`, `"Spotify"`) en lugar de rutas fijas que cambiaban con cada instalacion
+
+### Added
+- Beam de energia desde el nucleo central hacia la tarjeta seleccionada (efecto HUD animado)
+- Corner brackets estilo mira/arqueria en las tarjetas (se acentuan en hover)
+- Halo exterior de hover dibujado manualmente (reemplaza al `QGraphicsDropShadowEffect`)
+- Pantalla de boot rediseñada: barra de progreso animada, titulo con glow medido por font metrics y posiciones dinamicas
+
+### Changed
+- `ui/mode_card.py`: sin `QGraphicsDropShadowEffect`, todo el glow se dibuja en `paintEvent`
+- Boot overlay centrado dinamicamente segun el ancho real del texto
+
+---
 
 ### Fixed
 - Error `ImportError: QDesktopWidget` en PyQt6: reemplazado por `QApplication.primaryScreen().availableGeometry()`

@@ -3,15 +3,36 @@ core/launcher.py - Motor de apertura de aplicaciones.
 
 Ejecuta la lista de apps asociadas a un modo de forma secuencial,
 con un pequeno delay entre cada una para evitar picos de CPU.
+
+Resolucion de comandos (en orden):
+  1. Si el comando es una URL -> navegador por defecto.
+  2. Si la ruta existe -> se lanza directamente.
+  3. Si el comando es un nombre corto (p. ej. "Discord") o la ruta
+     no existe -> se busca el ejecutable en el menu de inicio del
+     usuario y del sistema (accesos directos .lnk) y en el registro
+     App Paths de Windows.
+  4. Si no se encuentra -> fallo con mensaje descriptivo.
 """
 
+import glob
+import logging
 import os
+import shutil
 import subprocess
 import time
-import logging
+import winreg
 from typing import Callable
 
 logger = logging.getLogger("jarvis.launcher")
+
+# Directorios del menu de inicio donde buscar accesos directos
+_START_MENU_DIRS = [
+    os.path.join(os.environ.get("APPDATA", ""), r"Microsoft\Windows\Start Menu\Programs"),
+    os.path.join(
+        os.environ.get("PROGRAMDATA", r"C:\ProgramData"),
+        r"Microsoft\Windows\Start Menu\Programs",
+    ),
+]
 
 
 class AppLauncher:
@@ -106,22 +127,18 @@ class AppLauncher:
                 logger.error(f"Error abriendo URL {command}: {exc}")
                 return False
 
-        # Si el ejecutable no existe, intentar con os.startfile (registros Windows)
-        if not os.path.exists(command):
-            logger.warning(
-                f"Ejecutable no encontrado: {command}. "
-                "Intentando os.startfile..."
+        # Resolver la ruta real del ejecutable
+        resolved = self._resolve_command(command)
+        if resolved is None:
+            logger.error(
+                f"No se encontro la aplicacion '{command}'. "
+                "Verifica que este instalada o corrige la ruta en config.json."
             )
-            try:
-                os.startfile(command)
-                return True
-            except OSError as exc:
-                logger.error(f"No se pudo abrir {command}: {exc}")
-                return False
+            return False
 
         # Lanzamiento normal
         try:
-            cmd_list = [command]
+            cmd_list = [resolved]
             if args:
                 cmd_list.extend(args.split())
             subprocess.Popen(
@@ -131,13 +148,107 @@ class AppLauncher:
                 creationflags=subprocess.DETACHED_PROCESS
                 | subprocess.CREATE_NEW_PROCESS_GROUP,
             )
-            logger.info(f"App lanzada: {command} {args}")
+            logger.info(f"App lanzada: {resolved} {args}")
             return True
         except Exception as exc:
-            logger.error(f"Error lanzando {command}: {exc}")
+            logger.error(f"Error lanzando {resolved}: {exc}")
             # Fallback: os.startfile
             try:
-                os.startfile(command)
+                os.startfile(resolved)
                 return True
             except OSError:
                 return False
+
+    # ------------------------------------------------------------------
+    # Resolucion de comandos
+    # ------------------------------------------------------------------
+
+    def _resolve_command(self, command: str) -> str | None:
+        """Devuelve la ruta real del ejecutable o None si no existe."""
+        # 1. Ruta absoluta existente
+        if os.path.exists(command):
+            return command
+
+        # 2. Ejecutable en el PATH
+        found = shutil.which(command)
+        if found:
+            return found
+
+        # 3. Nombre en menu de inicio (usuario y sistema)
+        exe_name = os.path.basename(command).split(".exe")[0]
+        found = self._find_in_start_menu(exe_name)
+        if found:
+            return found
+
+        # 4. Registro App Paths de Windows (HKCU y HKLM)
+        found = self._find_in_app_paths(command)
+        if found:
+            return found
+
+        return None
+
+    def _find_in_start_menu(self, app_name: str) -> str | None:
+        """
+        Busca un acceso directo .lnk cuyo nombre coincida con app_name
+        (insensible a mayusculas) y extrae el TargetPath del ejecutable.
+        """
+        app_lower = app_name.lower()
+        for start_dir in _START_MENU_DIRS:
+            if not os.path.isdir(start_dir):
+                continue
+            pattern = os.path.join(start_dir, "**", "*.lnk")
+            for lnk in glob.glob(pattern, recursive=True):
+                base = os.path.splitext(os.path.basename(lnk))[0].lower()
+                if app_lower in base:
+                    target = self._read_lnk_target(lnk)
+                    if target and os.path.exists(target) and target.lower().endswith(".exe"):
+                        logger.info(f"App '{app_name}' resuelta via: {lnk}")
+                        return target
+        return None
+
+    @staticmethod
+    def _read_lnk_target(lnk_path: str) -> str | None:
+        """Extrae TargetPath de un .lnk usando WScript.Shell (COM via PowerShell)."""
+        import subprocess as sp
+
+        ps_script = (
+            "$s=(New-Object -ComObject WScript.Shell).CreateShortcut("
+            f"'{lnk_path}'); $s.TargetPath"
+        )
+        try:
+            out = sp.run(
+                ["powershell", "-NoProfile", "-NonInteractive", "-Command", ps_script],
+                capture_output=True,
+                text=True,
+                timeout=8,
+                creationflags=sp.CREATE_NO_WINDOW,
+            )
+            target = out.stdout.strip()
+            return target if target else None
+        except Exception as exc:  # pragma: no cover
+            logger.warning(f"No se pudo leer el acceso directo {lnk_path}: {exc}")
+            return None
+
+    def _find_in_app_paths(self, command: str) -> str | None:
+        """Busca el ejecutable en la clave App Paths del registro."""
+        exe_name = os.path.basename(command)
+        if not exe_name.lower().endswith(".exe"):
+            exe_name += ".exe"
+
+        base_key = r"Software\Microsoft\Windows\CurrentVersion\App Paths"
+        candidates = [
+            (winreg.HKEY_CURRENT_USER, rf"{base_key}\{exe_name}"),
+            (winreg.HKEY_LOCAL_MACHINE, rf"{base_key}\{exe_name}"),
+            (winreg.HKEY_LOCAL_MACHINE, rf"Software\WOW6432Node\{base_key}\{exe_name}"),
+        ]
+
+        for hive, key_path in candidates:
+            try:
+                with winreg.OpenKey(hive, key_path) as key:
+                    value, _ = winreg.QueryValueEx(key, "")
+                    if value and os.path.exists(value):
+                        logger.info(f"App '{command}' resuelta via App Paths: {value}")
+                        return value
+            except OSError:
+                continue
+        return None

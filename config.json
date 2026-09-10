@@ -1,6 +1,6 @@
 {
     "app_name": "J.A.R.V.I.S. Launcher",
-    "version": "1.1.0",
+    "version": "1.2.0",
     "greeting": "Buenos dias, senpai. Selecciona tu modo de operacion:",
     "modes": {
         "gaming": {
@@ -15,12 +15,11 @@
                 },
                 {
                     "name": "Discord",
-                    "command": "C:\\Users\\Duvan Altamar\\AppData\\Local\\Discord\\Update.exe",
-                    "args": "--processStart Discord.exe"
+                    "command": "Discord"
                 },
                 {
                     "name": "Spotify",
-                    "command": "C:\\Users\\Duvan Altamar\\AppData\\Roaming\\Spotify\\Spotify.exe"
+                    "command": "Spotify"
                 }
             ]
         },
@@ -40,8 +39,7 @@
                 },
                 {
                     "name": "Discord",
-                    "command": "C:\\Users\\Duvan Altamar\\AppData\\Local\\Discord\\Update.exe",
-                    "args": "--processStart Discord.exe"
+                    "command": "Discord"
                 }
             ]
         },

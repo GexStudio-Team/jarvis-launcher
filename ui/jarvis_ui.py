@@ -7,10 +7,17 @@ Efectos visuales:
   - Linea de escaneo horizontal
   - Grid sutil de fondo
   - Texto con efecto glow
-  - Pantalla de boot animada al iniciar
+  - Pantalla de boot animada con barra de progreso (100% custom paint)
   - Greeting con efecto typewriter
   - Flash de color del modo al seleccionar
+  - Beam de energia desde el nucleo hacia la card seleccionada
   - Transiciones suaves entre estados
+
+IMPORTANTE: no se usan QGraphicsEffect (QGraphicsOpacityEffect / 
+QGraphicsDropShadowEffect). En Qt6, aplicarlos junto a paintEvent custom
+produce conflictos de QPainter ("paint device already painted"). Todos los
+efectos de opacidad se hacen con propiedades propias + repintado manual, y
+el fade de la ventana con la propiedad nativa windowOpacity.
 """
 
 import math
@@ -43,7 +50,6 @@ from PyQt6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QPushButton,
-    QGraphicsOpacityEffect,
 )
 
 from core.feedback import play_click, play_success, play_error
@@ -91,83 +97,51 @@ class Particle:
 class BootOverlay(QWidget):
     """
     Pantalla de carga inicial tipo arranque de sistema.
-    Texto centrado con animacion de puntos.
+
+    Pintura 100% custom (sin QGraphicsEffect): fondo oscuro, titulo con
+    glow, barra de progreso animada, status con puntos y fecha.
+    La propiedad `fade` (0..1) controla la opacidad total para el fade-out.
     """
 
     def __init__(self, app_name: str, version: str, parent: QWidget) -> None:
         super().__init__(parent)
         self.setGeometry(parent.rect())
         self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
-
-        layout = QVBoxLayout(self)
-        layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.setSpacing(12)
-
-        self._name_label = QLabel(app_name, self)
-        self._name_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._name_label.setStyleSheet(
-            """
-            QLabel {
-                color: #00FFFF;
-                font-size: 42px;
-                font-weight: bold;
-                letter-spacing: 8px;
-                background: transparent;
-            }
-            """
-        )
-        layout.addWidget(self._name_label)
-
-        self._status_label = QLabel("INICIANDO SISTEMA", self)
-        self._status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._status_label.setStyleSheet(
-            """
-            QLabel {
-                color: rgba(0, 255, 255, 150);
-                font-size: 12px;
-                letter-spacing: 4px;
-                background: transparent;
-            }
-            """
-        )
-        layout.addWidget(self._status_label)
-
-        self._time_label = QLabel(
-            datetime.now().strftime("%d %b %Y - %H:%M"), self
-        )
-        self._time_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._time_label.setStyleSheet(
-            """
-            QLabel {
-                color: rgba(255, 255, 255, 70);
-                font-size: 10px;
-                letter-spacing: 1px;
-                background: transparent;
-            }
-            """
-        )
-        layout.addWidget(self._time_label)
-
+        self._app_name = app_name
+        self._version = version
+        self._fade: float = 1.0
+        self._progress: float = 0.0
         self._dots = 0
+
+        # Timer de animacion
+        self._anim_timer = QTimer(self)
+        self._anim_timer.timeout.connect(self._tick_anim)
+        self._anim_timer.start(32)
+
+        # Timer de puntos
         self._dots_timer = QTimer(self)
         self._dots_timer.timeout.connect(self._animate_dots)
         self._dots_timer.start(220)
 
-        # Efecto opacidad para el fade-out
-        self._fx = QGraphicsOpacityEffect(self)
-        self._fx.setOpacity(1.0)
-        self.setGraphicsEffect(self._fx)
+    # ------------------------------------------------------------------
+    # Animaciones internas
+    # ------------------------------------------------------------------
+
+    def _tick_anim(self) -> None:
+        # La barra de progreso avanza hasta 0.95 y luego espera el fade
+        if self._progress < 0.95:
+            self._progress = min(0.95, self._progress + 0.012)
+        self.update()
 
     def _animate_dots(self) -> None:
         self._dots = (self._dots + 1) % 4
-        self._status_label.setText(
-            "INICIANDO SISTEMA" + "." * self._dots
-        )
+        self.update()
 
     def fade_out(self, on_done=None) -> None:
-        """Animacion de salida del overlay."""
+        """Animacion de salida del overlay (fade custom)."""
+        self._anim_timer.stop()
         self._dots_timer.stop()
-        anim = QPropertyAnimation(self._fx, b"opacity")
+        anim = QPropertyAnimation(self, b"fade")
         anim.setDuration(500)
         anim.setStartValue(1.0)
         anim.setEndValue(0.0)
@@ -178,6 +152,96 @@ class BootOverlay(QWidget):
         anim.start()
         self._boot_fade = anim
 
+    # ------------------------------------------------------------------
+    # Qt Property `fade`
+    # ------------------------------------------------------------------
+
+    def _get_fade(self) -> float:
+        return self._fade
+
+    def _set_fade(self, val: float) -> None:
+        self._fade = val
+        self.update()
+
+    fade = pyqtProperty(float, _get_fade, _set_fade)
+
+    # ------------------------------------------------------------------
+    # Pintura
+    # ------------------------------------------------------------------
+
+    def paintEvent(self, event) -> None:
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        w, h = self.width(), self.height()
+        f = self._fade
+
+        # Fondo solido
+        p.fillRect(0, 0, w, h, QColor(8, 10, 18, int(255 * f)))
+
+        # Titulo con glow (doblete de texto para efecto neon)
+        title_font = QFont("Segoe UI", 40, QFont.Weight.Bold)
+        title_font.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, 10)
+        p.setFont(title_font)
+
+        # Medir el texto para centrarlo
+        fm = p.fontMetrics()
+        title_w = fm.horizontalAdvance(self._app_name)
+        title_h = fm.height()
+        title_x = (w - title_w) // 2
+        title_y = h // 2 - 50
+
+        # Sombra glow
+        glow = QRadialGradient(
+            float(w / 2), float(title_y + title_h / 2), float(title_w * 0.6)
+        )
+        glow.setColorAt(0.0, QColor(0, 255, 255, int(70 * f)))
+        glow.setColorAt(1.0, QColor(0, 0, 0, 0))
+        p.setPen(Qt.PenStyle.NoPen)
+        p.setBrush(glow)
+        p.drawRoundedRect(
+            title_x - 60, title_y - 40, title_w + 120, title_h + 80, 40, 40
+        )
+
+        # Texto principal con glow simple
+        p.setPen(QColor(0, 255, 255, int(235 * f)))
+        p.drawText(title_x, title_y + title_h - 10, self._app_name)
+        p.setPen(QColor(0, 255, 255, int(60 * f)))
+        p.drawText(title_x + 2, title_y + title_h - 8, self._app_name)
+
+        # Version
+        p.setPen(QColor(255, 255, 255, int(80 * f)))
+        p.setFont(QFont("Segoe UI", 10))
+        p.drawText(w // 2 - 60, title_y + title_h + 10, f"v{self._version}")
+
+        # Barra de progreso
+        bar_w, bar_h = 340, 4
+        bx = (w - bar_w) // 2
+        by = title_y + title_h + 40
+        p.setPen(QPen(QColor(0, 255, 255, int(50 * f)), 1))
+        p.setBrush(Qt.BrushStyle.NoBrush)
+        p.drawRoundedRect(bx, by, bar_w, bar_h, 2, 2)
+
+        p.setPen(Qt.PenStyle.NoPen)
+        filled = int(bar_w * self._progress)
+        if filled > 4:
+            grad = QLinearGradient(bx, by, bx + bar_w, by)
+            grad.setColorAt(0.0, QColor(0, 180, 220, int(220 * f)))
+            grad.setColorAt(1.0, QColor(0, 255, 255, int(220 * f)))
+            p.setBrush(grad)
+            p.drawRoundedRect(bx, by, filled, bar_h, 2, 2)
+
+        # Status con puntos animados
+        p.setPen(QColor(0, 255, 255, int(150 * f)))
+        p.setFont(QFont("Segoe UI", 12))
+        status = "INICIANDO SISTEMA" + "." * self._dots
+        p.drawText(w // 2 - 80, by + 30, status)
+
+        # Fecha
+        p.setPen(QColor(255, 255, 255, int(70 * f)))
+        p.setFont(QFont("Segoe UI", 9))
+        fecha = datetime.now().strftime("%d %b %Y - %H:%M")
+        p.drawText(w - 160, h - 20, fecha)
+
 
 class FlashOverlay(QWidget):
     """Overlay de flash a todo color al seleccionar un modo."""
@@ -187,17 +251,31 @@ class FlashOverlay(QWidget):
         self.setGeometry(parent.rect())
         self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         self._color = QColor(color)
-        self._fx = QGraphicsOpacityEffect(self)
-        self._fx.setOpacity(0.0)
-        self.setGraphicsEffect(self._fx)
+        self._alpha: float = 0.0
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, False)
+
+    # ------------------------------------------------------------------
+    # Qt Property `alpha`
+    # ------------------------------------------------------------------
+
+    def _get_alpha(self) -> float:
+        return self._alpha
+
+    def _set_alpha(self, val: float) -> None:
+        self._alpha = val
+        self.update()
+
+    alpha = pyqtProperty(float, _get_alpha, _set_alpha)
 
     def paintEvent(self, event) -> None:
         p = QPainter(self)
-        p.fillRect(self.rect(), self._color)
+        color = QColor(self._color)
+        color.setAlpha(int(255 * self._alpha))
+        p.fillRect(self.rect(), color)
 
     def animate(self) -> QPropertyAnimation:
         """Flash 0 -> 0.25 -> 0 y eliminacion del widget."""
-        anim = QPropertyAnimation(self._fx, b"opacity")
+        anim = QPropertyAnimation(self, b"alpha")
         anim.setDuration(450)
         anim.setKeyValueAt(0.0, 0.0)
         anim.setKeyValueAt(0.3, 0.25)
@@ -245,6 +323,11 @@ class JarvisUI(QWidget):
         self._is_launching = False
         self._launch_message = ""
 
+        # Beam de energia (card seleccionada animada)
+        self._beam_card: ModeCard | None = None
+        self._beam_t: float = 0.0
+        self._beam_active = False
+
         # Estado de ultimos modos
         self._state = StateManager()
 
@@ -255,6 +338,7 @@ class JarvisUI(QWidget):
             | Qt.WindowType.WindowStaysOnTopHint
         )
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, False)
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, False)
         self.setMinimumSize(1200, 800)
         self._center_on_screen()
 
@@ -301,11 +385,6 @@ class JarvisUI(QWidget):
     # ------------------------------------------------------------------
 
     def _build_ui(self) -> None:
-        # ---- Efecto opacidad para fade-in ----
-        self._opacity_effect = QGraphicsOpacityEffect(self)
-        self._opacity_effect.setOpacity(0.0)
-        self.setGraphicsEffect(self._opacity_effect)
-
         # ---- Layout principal ----
         self._main_layout = QVBoxLayout(self)
         self._main_layout.setContentsMargins(60, 40, 60, 30)
@@ -473,9 +552,9 @@ class JarvisUI(QWidget):
     # ------------------------------------------------------------------
 
     def _run_boot_sequence(self) -> None:
-        """Pantalla de boot, luego fade y typewriter del greeting."""
-        # Fade-in de la ventana
-        fade = QPropertyAnimation(self._opacity_effect, b"opacity")
+        """Pantalla de boot, luego fade (windowOpacity) y typewriter."""
+        # Fade-in de la ventana (propiedad nativa, sin QGraphicsEffect)
+        fade = QPropertyAnimation(self, b"windowOpacity")
         fade.setDuration(600)
         fade.setStartValue(0.0)
         fade.setEndValue(1.0)
@@ -555,6 +634,12 @@ class JarvisUI(QWidget):
         play_click()
         self._is_launching = True
         self._launch_message = ""
+
+        # Beam de energia hacia la card seleccionada
+        self._beam_card = self._mode_cards.get(mode_id)
+        self._beam_t = 0.0
+        self._beam_active = True
+
         self._status_label.setText(
             f"MODO {mode_id.upper()} SELECCIONADO - INICIANDO..."
         )
@@ -580,6 +665,8 @@ class JarvisUI(QWidget):
     ) -> None:
         """Callback cuando termina el lanzamiento de apps."""
         self._is_launching = False
+        self._beam_active = False
+        self._beam_card = None
 
         # Registrar en historial
         self._state.record_mode(mode_id, mode_name)
@@ -671,6 +758,12 @@ class JarvisUI(QWidget):
         if self._scan_y > self.height() + 20:
             self._scan_y = -20
 
+        # Beam de energia
+        if self._beam_active:
+            self._beam_t += 0.016
+            if self._beam_t > 1.2:
+                self._beam_t = 0.0
+
         self.update()
 
     # ------------------------------------------------------------------
@@ -696,6 +789,9 @@ class JarvisUI(QWidget):
 
         # ---- Linea de escaneo ----
         self._draw_scan_line(p, w)
+
+        # ---- Beam de energia hacia la card ----
+        self._draw_beam(p, w, h)
 
         # ---- Overlay radial oscuro (vignette) ----
         self._draw_vignette(p, w, h)
@@ -812,6 +908,50 @@ class JarvisUI(QWidget):
             int(cx - core_radius), int(cy - core_radius),
             int(core_radius * 2), int(core_radius * 2),
         )
+
+    def _draw_beam(self, p: QPainter, w: int, h: int) -> None:
+        """
+        Beam de energia desde el nucleo central hacia la card seleccionada.
+
+        Se dibuja un cono/triangulo con gradiente que pulsa (via _beam_t).
+        """
+        if not self._beam_active or self._beam_card is None:
+            return
+        if not self._beam_card.isVisible():
+            return
+
+        cx, cy = w // 2, h // 2
+        target = self._beam_card.mapTo(self, self._beam_card.rect().center())
+
+        # Pulso sinusoidal
+        pulse = 0.6 + 0.4 * math.sin(self._beam_t * 14.0)
+        alpha = int(90 * pulse)
+
+        # Cono desde el nucleo hacia la card
+        dx = target.x() - cx
+        dy = target.y() - cy
+        dist = math.hypot(dx, dy)
+        if dist < 20:
+            return
+
+        # Punto intermedio hacia donde viaja la energia
+        travel = (self._beam_t % 1.0)
+        px = cx + dx * travel
+        py = cy + dy * travel
+
+        # Linea principal
+        beam_pen = QPen(QColor(0, 255, 255, alpha))
+        beam_pen.setWidth(2)
+        p.setPen(beam_pen)
+        p.drawLine(cx, cy, int(px), int(py))
+
+        # Halo alrededor de la card
+        grad = QRadialGradient(float(target.x()), float(target.y()), 60)
+        grad.setColorAt(0.0, QColor(0, 255, 255, int(90 * pulse)))
+        grad.setColorAt(1.0, QColor(0, 0, 0, 0))
+        p.setPen(Qt.PenStyle.NoPen)
+        p.setBrush(grad)
+        p.drawEllipse(target.x() - 60, target.y() - 60, 120, 120)
 
     def _draw_scan_line(self, p: QPainter, w: int) -> None:
         y = int(self._scan_y)

@@ -1,7 +1,8 @@
 """
 ui/mode_card.py - Tarjeta animada para cada modo del Jarvis Launcher.
 
-Efectos: glassmorphism, hover con glow, borde animado, transiciones suaves.
+Efectos: glassmorphism, hover con halo propio (sin QGraphicsEffect),
+borde con gradiente, corner brackets estilo HUD y transiciones suaves.
 """
 
 from PyQt6.QtCore import (
@@ -11,7 +12,6 @@ from PyQt6.QtCore import (
     QEasingCurve,
     pyqtProperty,
     pyqtSignal,
-    QSize,
 )
 from PyQt6.QtGui import (
     QColor,
@@ -22,24 +22,15 @@ from PyQt6.QtGui import (
     QPen,
     QPainterPath,
 )
-from PyQt6.QtWidgets import (
-    QWidget,
-    QVBoxLayout,
-    QLabel,
-    QGraphicsDropShadowEffect,
-)
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel
 
 
 class ModeCard(QWidget):
     """
     Tarjeta visual para un modo (Gaming / Trabajo / Estudio).
 
-    Efectos:
-      - Fondo glassmorphism semitransparente
-      - Borde con gradiente del color del modo
-      - Glow pulsante en hover
-      - Animacion de elevacion al pasar el mouse
-      - Icono grande, nombre y descripcion
+    IMPORTANTE: NO usa QGraphicsEffect (causa conflictos de QPainter
+    con paintEvent custom en Qt6). Todo el glow/halo se dibuja a mano.
     """
 
     HOVER_HEIGHT_BOOST = 8
@@ -72,14 +63,7 @@ class ModeCard(QWidget):
         self.setAttribute(Qt.WidgetAttribute.WA_Hover, True)
         self.setMouseTracking(True)
 
-        # Shadow
-        self._shadow = QGraphicsDropShadowEffect(self)
-        self._shadow.setBlurRadius(0)
-        self._shadow.setColor(QColor(0, 0, 0, 0))
-        self._shadow.setOffset(0, 0)
-        self.setGraphicsEffect(self._shadow)
-
-        # Internal layout
+        # Sin QGraphicsDropShadowEffect: se dibuja halo manual en paintEvent
         self._build_layout()
 
     # ------------------------------------------------------------------
@@ -193,14 +177,12 @@ class ModeCard(QWidget):
     def enterEvent(self, event) -> None:
         self._is_hovered = True
         self._animate_glow(1.0)
-        self._animate_shadow(True)
         self._animate_height(self._base_height + self.HOVER_HEIGHT_BOOST)
         super().enterEvent(event)
 
     def leaveEvent(self, event) -> None:
         self._is_hovered = False
         self._animate_glow(0.0)
-        self._animate_shadow(False)
         self._animate_height(self._base_height)
         super().leaveEvent(event)
 
@@ -210,26 +192,12 @@ class ModeCard(QWidget):
 
     def _animate_glow(self, target: float) -> None:
         anim = QPropertyAnimation(self, b"glowOpacity")
-        anim.setDuration(200)
+        anim.setDuration(250)
         anim.setStartValue(self._glow_opacity)
         anim.setEndValue(target)
         anim.setEasingCurve(QEasingCurve.Type.InOutQuad)
         anim.start()
         self._glow_anim = anim
-
-    def _animate_shadow(self, active: bool) -> None:
-        anim = QPropertyAnimation(self._shadow, b"blurRadius")
-        anim.setDuration(250)
-        if active:
-            anim.setStartValue(0)
-            anim.setEndValue(40)
-            self._shadow.setColor(self._color)
-        else:
-            anim.setStartValue(40)
-            anim.setEndValue(0)
-        anim.setEasingCurve(QEasingCurve.Type.InOutQuad)
-        anim.start()
-        self._shadow_anim = anim
 
     def _animate_height(self, target: int) -> None:
         anim = QPropertyAnimation(self, b"cardHeight")
@@ -267,13 +235,8 @@ class ModeCard(QWidget):
     # Pintura custom
     # ------------------------------------------------------------------
 
-    def paintEvent(self, event) -> None:
-        p = QPainter(self)
-        p.setRenderHint(QPainter.RenderHint.Antialiasing)
-        w, h = self.width(), self.height()
-
-        # ---- Path con esquinas redondeadas ----
-        radius = 16.0
+    @staticmethod
+    def _rounded_rect_path(w: float, h: float, radius: float) -> QPainterPath:
         path = QPainterPath()
         path.moveTo(radius, 0)
         path.lineTo(w - radius, 0)
@@ -285,6 +248,32 @@ class ModeCard(QWidget):
         path.lineTo(0, radius)
         path.quadTo(0, 0, radius, 0)
         path.closeSubpath()
+        return path
+
+    def paintEvent(self, event) -> None:
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        w, h = self.width(), self.height()
+        radius = 16.0
+
+        # ---- Halo exterior (hover) ----
+        # Reemplaza el QGraphicsDropShadowEffect sin conflictos de QPainter
+        if self._glow_opacity > 0.01:
+            p.save()
+            halo_path = self._rounded_rect_path(w + 28, h + 28, radius + 8)
+            halo_path.translate(-14, -14)
+            glow_color = QColor(self._color)
+            glow_color.setAlpha(int(46 * self._glow_opacity))
+            grad = QRadialGradient(w / 2, h / 2, w * 0.55)
+            grad.setColorAt(0.0, glow_color)
+            grad.setColorAt(1.0, QColor(0, 0, 0, 0))
+            p.setPen(Qt.PenStyle.NoPen)
+            p.setBrush(grad)
+            p.drawPath(halo_path)
+            p.restore()
+
+        # ---- Path principal ----
+        path = self._rounded_rect_path(w, h, radius)
 
         # ---- Fondo glassmorphism ----
         p.save()
@@ -299,15 +288,26 @@ class ModeCard(QWidget):
         border_pen.setWidth(2)
         border_grad = QLinearGradient(0, 0, w, h)
         alpha = int(80 + 175 * self._glow_opacity)
-        border_grad.setColorAt(0.0, QColor(self._color.red(), self._color.green(), self._color.blue(), alpha))
-        border_grad.setColorAt(1.0, QColor(self._color.red(), self._color.green(), self._color.blue(), int(alpha * 0.3)))
+        border_grad.setColorAt(
+            0.0,
+            QColor(self._color.red(), self._color.green(), self._color.blue(), alpha),
+        )
+        border_grad.setColorAt(
+            1.0,
+            QColor(
+                self._color.red(),
+                self._color.green(),
+                self._color.blue(),
+                int(alpha * 0.3),
+            ),
+        )
         border_pen.setBrush(border_grad)
         p.setPen(border_pen)
         p.setBrush(Qt.BrushStyle.NoBrush)
         p.drawPath(path)
         p.restore()
 
-        # ---- Glow radial (hover) ----
+        # ---- Glow radial interior (hover) ----
         if self._glow_opacity > 0.01:
             p.save()
             p.setClipPath(path)
@@ -321,11 +321,49 @@ class ModeCard(QWidget):
             p.fillRect(0, 0, w, h, grad)
             p.restore()
 
+        # ---- Corner brackets estilo HUD ----
+        self._draw_corner_brackets(p, w, h, radius)
+
         # ---- Linea decorativa inferior ----
         p.save()
         p.setClipPath(path)
-        line_pen = QPen(QColor(self._color.red(), self._color.green(), self._color.blue(), int(60 + 40 * self._glow_opacity)))
+        line_pen = QPen(
+            QColor(
+                self._color.red(),
+                self._color.green(),
+                self._color.blue(),
+                int(60 + 40 * self._glow_opacity),
+            )
+        )
         line_pen.setWidth(1)
         p.setPen(line_pen)
         p.drawLine(24, h - 40, w - 24, h - 40)
         p.restore()
+
+    def _draw_corner_brackets(
+        self, p: QPainter, w: int, h: int, radius: float
+    ) -> None:
+        """
+        Dibuja 4 esquinas tipo mira (arqueria HUD) en el borde de la card.
+        Solo aparecen completas al hacer hover.
+        """
+        length = 22
+        margin = 9
+        alpha = int(35 + 220 * self._glow_opacity)
+        pen = QPen(QColor(0, 255, 255, alpha))
+        pen.setWidth(2)
+        p.setPen(pen)
+
+        def bracket(cx: int, cy: int, dx: int, dy: int) -> None:
+            """dx/dy orientan: +1/-1 en cada eje."""
+            p.drawLine(cx, cy, cx + dx * length, cy)
+            p.drawLine(cx, cy, cx, cy + dy * length)
+
+        # Esquina sup-izq
+        bracket(margin, margin, 1, 1)
+        # Esquina sup-der
+        bracket(w - margin, margin, -1, 1)
+        # Esquina inf-izq
+        bracket(margin, h - margin, 1, -1)
+        # Esquina inf-der
+        bracket(w - margin, h - margin, -1, -1)
