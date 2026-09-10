@@ -18,6 +18,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from core.config import ConfigManager
 from core.launcher import AppLauncher
+from core.settings import SettingsManager
 from ui.jarvis_ui import JarvisUI
 
 # -----------------------------------------------------------------------
@@ -151,7 +152,8 @@ def main() -> int:
 
     # Crear launcher y ventana principal
     launcher = AppLauncher()
-    ui = JarvisUI(config._config)
+    settings = SettingsManager()
+    ui = JarvisUI(config._config, settings=settings)
     ui._on_mode_selected = _handle_mode_selected(launcher, ui, config)
 
     ui.show()
