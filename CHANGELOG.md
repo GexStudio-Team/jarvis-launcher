@@ -42,6 +42,8 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/).
 
 ---
 
+## [1.1.0] - 2026-09-09 (America/Bogota)
+
 ### Fixed
 - Error `ImportError: QDesktopWidget` en PyQt6: reemplazado por `QApplication.primaryScreen().availableGeometry()`
 - Fuga del lock de instancia unica: el socket ahora se retiene globalmente y no usa SO_REUSEADDR
