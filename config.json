@@ -1,0 +1,71 @@
+{
+    "app_name": "J.A.R.V.I.S. Launcher",
+    "version": "1.0.0",
+    "greeting": "Buenos dias, senpai. Selecciona tu modo de operacion:",
+    "modes": {
+        "gaming": {
+            "name": "Gaming",
+            "icon": "🎮",
+            "color": "#FF2D55",
+            "description": "Listo para la accion",
+            "apps": [
+                {
+                    "name": "Steam",
+                    "command": "C:\\Program Files (x86)\\Steam\\steam.exe"
+                },
+                {
+                    "name": "Discord",
+                    "command": "C:\\Users\\Duvan Altamar\\AppData\\Local\\Discord\\Update.exe",
+                    "args": "--processStart Discord.exe"
+                },
+                {
+                    "name": "Spotify",
+                    "command": "C:\\Users\\Duvan Altamar\\AppData\\Roaming\\Spotify\\Spotify.exe"
+                }
+            ]
+        },
+        "work": {
+            "name": "Trabajo",
+            "icon": "💼",
+            "color": "#007AFF",
+            "description": "Modo productividad activado",
+            "apps": [
+                {
+                    "name": "VS Code",
+                    "command": "C:\\Users\\Duvan Altamar\\AppData\\Local\\Programs\\Microsoft VS Code\\Code.exe"
+                },
+                {
+                    "name": "Chrome",
+                    "command": "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe"
+                },
+                {
+                    "name": "Discord",
+                    "command": "C:\\Users\\Duvan Altamar\\AppData\\Local\\Discord\\Update.exe",
+                    "args": "--processStart Discord.exe"
+                }
+            ]
+        },
+        "study": {
+            "name": "Estudio",
+            "icon": "📚",
+            "color": "#30D158",
+            "description": "Modo aprendizaje activado",
+            "apps": [
+                {
+                    "name": "VS Code",
+                    "command": "C:\\Users\\Duvan Altamar\\AppData\\Local\\Programs\\Microsoft VS Code\\Code.exe"
+                },
+                {
+                    "name": "Chrome (Notion)",
+                    "command": "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+                    "args": "https://notion.so"
+                },
+                {
+                    "name": "Chrome (YouTube)",
+                    "command": "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+                    "args": "https://youtube.com"
+                }
+            ]
+        }
+    }
+}
