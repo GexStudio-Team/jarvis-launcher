@@ -6,6 +6,21 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/).
 
 ---
 
+## [Unreleased]
+
+### Added
+- Carpeta `docs/` como fuente principal de documentación técnica:
+  - `docs/Arquitectura.md`: componentes, módulos, flujo de información, operaciones y deuda técnica
+  - `docs/ADR-001-quitar-qgraphicseffect.md`: decisión de eliminar `QGraphicsEffect` y pintar efectos manualmente (v1.2.0)
+  - `docs/ADR-002-resolucion-apps-por-nombre.md`: decisión de resolución de rutas por nombre corto (v1.2.0)
+  - `docs/ADR-003-comando-global-jarvis.md`: decisión del comando global `jarvis` (v1.3.0)
+- Enlace a `docs/` desde el README raíz (documentación técnica separada de la de usuario)
+
+### Changed
+- README raíz ahora se declara explícitamente como documentación de usuario final
+
+---
+
 ## [1.3.0] - 2026-09-10 (America/Bogota)
 
 ### Added

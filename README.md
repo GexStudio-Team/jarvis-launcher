@@ -39,6 +39,9 @@ pip install -r requirements.txt
 python main.py
 ```
 
+Para detalles de arquitectura, decisiones técnicas (ADRs) y trabajo pendiente
+para desarrolladores, consulta [`docs/`](./docs/).
+
 ## Comando global `jarvis`
 
 Instala el comando `jarvis` en el PATH de usuario para abrir el launcher
@@ -162,4 +165,8 @@ jarvis-launcher/
 └── assets/
     ├── startup.vbs      # Script de auto-inicio Windows
     └── jarvis.cmd       # Origen del comando global `jarvis`
+└── docs/                # Documentacion tecnica (Arquitectura + ADRs)
 ```
+
+Nota: `docs/` es la fuente principal de documentación técnica para
+desarrolladores; el README está orientado a usuario final.
