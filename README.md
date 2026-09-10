@@ -5,11 +5,18 @@ Interfaz tipo JARVIS (Iron Man) que se ejecuta al iniciar Windows y permite lanz
 ## Caracteristicas
 
 - Interfaz fullscreen con efectos HUD: anillos rotantes, particulas flotantes, linea de escaneo
+- Pantalla de boot animada tipo arranque de sistema
+- Greeting con efecto typewriter
 - 3 modos predefinidos: Gaming, Trabajo, Estudio (personalizables via `config.json`)
-- Animaciones suaves en las tarjetas (hover glow, elevacion, transiciones)
+- Animaciones suaves en las tarjetas (hover glow, elevacion, pulse al click)
+- Flash de color del modo al seleccionar
+- Sonidos de feedback (click, exito, error)
+- Notificaciones toast de Windows al completar el lanzamiento
+- Historial de modos recientes en la barra de estado
 - Auto-inicio en Windows (activable/desactivable desde la interfaz)
 - Deteccion de instancia unica (no abre dos veces)
 - Lanzamiento de apps en hilo separado (no bloquea la UI)
+- Soporte multi-monitor (centrado en el monitor primario)
 
 ## Requisitos
 
@@ -100,11 +107,15 @@ Para desactivar, ejecuta el mismo script nuevamente.
 jarvis-launcher/
 ├── main.py              # Entry point
 ├── config.json          # Configuracion de modos (edita aqui)
+├── state.json           # Estado/historial (generado automaticamente)
 ├── requirements.txt     # Dependencias Python
 ├── install_startup.bat  # Instalar/desinstalar auto-inicio
 ├── core/
 │   ├── config.py        # Gestor de configuracion
-│   └── launcher.py      # Motor de apertura de apps
+│   ├── launcher.py      # Motor de apertura de apps
+│   ├── state.py         # Historial de modos recientes
+│   ├── feedback.py      # Sonidos de feedback (winsound)
+│   └── notifier.py      # Notificaciones toast de Windows
 ├── ui/
 │   ├── jarvis_ui.py     # Ventana principal con efectos HUD
 │   └── mode_card.py     # Tarjetas animadas de modo

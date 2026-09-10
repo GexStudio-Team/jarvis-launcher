@@ -13,16 +13,19 @@
 - [x] `requirements.txt`
 - [x] `.gitignore`
 - [x] Repo publico GitHub (GexStudio-Team/jarvis-launcher)
+- [x] Fix PyQt6: QDesktopWidget -> QApplication.primaryScreen()
+- [x] Fix singleton: retencion global del socket (lock estable)
+- [x] Sonidos de feedback (click, exito, error)
+- [x] Efecto de typewriter en el greeting
+- [x] Pantalla de carga animada al iniciar
+- [x] Historial de modos recientes
+- [x] Animacion de seleccion con flash de color del modo
+- [x] Notificaciones Windows al completar lanzamiento
+- [x] soporte multi-monitor
 
 ## Pendiente
 
-- [ ] Sonidos de feedback (click, hover, transicion)
-- [ ] Efecto de typewriter en el greeting
-- [ ] Pantalla de carga animada al iniciar
 - [ ] Soporte para modo oscuro / claro
 - [ ] Editor grafico de modos (GUI para agregar/quitar apps)
-- [ ] Historial de modos recientes
-- [ ] Animacion de seleccion con flash de color del modo
-- [ ] Notificaciones Windows al completar lanzamiento
 - [ ] Scripts predefinidos para mas modos (Docker, Streaming, etc.)
-- [ ] soporte multi-monitor
+- [ ] Sonido en hover de tarjetas

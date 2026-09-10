@@ -7,8 +7,10 @@ Efectos: glassmorphism, hover con glow, borde animado, transiciones suaves.
 from PyQt6.QtCore import (
     Qt,
     QPropertyAnimation,
+    QSequentialAnimationGroup,
     QEasingCurve,
     pyqtProperty,
+    pyqtSignal,
     QSize,
 )
 from PyQt6.QtGui import (
@@ -41,6 +43,9 @@ class ModeCard(QWidget):
     """
 
     HOVER_HEIGHT_BOOST = 8
+
+    # Senal emitida al hacer click izquierdo
+    modeClicked = pyqtSignal(str)
 
     def __init__(
         self,
@@ -150,6 +155,36 @@ class ModeCard(QWidget):
     def set_app_count(self, count: int) -> None:
         word = "app" if count == 1 else "apps"
         self._apps_label.setText(f"{count} {word} para lanzar")
+
+    # ------------------------------------------------------------------
+    # Interaccion
+    # ------------------------------------------------------------------
+
+    def mousePressEvent(self, event) -> None:
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.animate_press()
+            self.modeClicked.emit(self.mode_id)
+        super().mousePressEvent(event)
+
+    def animate_press(self) -> None:
+        """Pulso rapido de presion (alto -> bajo -> alto)."""
+        group = QSequentialAnimationGroup(self)
+
+        down = QPropertyAnimation(self, b"cardHeight")
+        down.setDuration(80)
+        down.setStartValue(self._current_height)
+        down.setEndValue(self._base_height - 6)
+        down.setEasingCurve(QEasingCurve.Type.OutQuad)
+
+        up = QPropertyAnimation(self, b"cardHeight")
+        up.setDuration(90)
+        up.setStartValue(self._base_height - 6)
+        up.setEndValue(self._base_height)
+        up.setEasingCurve(QEasingCurve.Type.InOutQuad)
+
+        group.addAnimation(down)
+        group.addAnimation(up)
+        group.start(QSequentialAnimationGroup.DeletionPolicy.DeleteWhenStopped)
 
     # ------------------------------------------------------------------
     # Hover

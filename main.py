@@ -35,17 +35,30 @@ logger = logging.getLogger("jarvis.main")
 # -----------------------------------------------------------------------
 SOCKET_PORT = 47821
 
+# Referencia global: el socket debe vivir toda la sesion,
+# de lo contrario el GC lo cierra y se pierde el lock.
+_singleton_socket: socket.socket | None = None
 
-def _is_already_running() -> bool:
-    """Intenta bindear un puerto para detectar otra instancia."""
+
+def _acquire_singleton() -> bool:
+    """
+    Adquiere el lock de instancia unica bindeando un puerto local.
+
+    Returns
+    -------
+    True si esta instancia tiene el lock; False si ya hay otra.
+    """
+    global _singleton_socket
     try:
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 0)
+        # Sin SO_REUSEADDR en Windows: el segundo bind falla con
+        # WSAEADDRINUSE -> deteccion de instancia duplicada.
         sock.bind(("127.0.0.1", SOCKET_PORT))
         sock.listen(1)
-        return False
-    except OSError:
+        _singleton_socket = sock
         return True
+    except OSError:
+        return False
 
 
 # -----------------------------------------------------------------------
@@ -58,13 +71,16 @@ def _handle_mode_selected(launcher: AppLauncher, ui: JarvisUI, config: ConfigMan
     def handler(mode_id: str) -> None:
         mode = config.get_mode(mode_id)
         if mode is None:
-            ui.set_launch_complete("Error", [], ["Modo no encontrado"])
+            ui.set_launch_complete(mode_id, "Error", [], ["Modo no encontrado"])
             return
 
         apps = mode.get("apps", [])
         if not apps:
             ui.set_launch_complete(
-                mode.get("name", mode_id), [], ["No hay apps configuradas"]
+                mode_id,
+                mode.get("name", mode_id),
+                [],
+                ["No hay apps configuradas"],
             )
             return
 
@@ -76,7 +92,7 @@ def _handle_mode_selected(launcher: AppLauncher, ui: JarvisUI, config: ConfigMan
             result = launcher.launch_mode(apps)
             # Actualizar UI en el hilo principal
             ui.set_launch_complete(
-                mode_name, result["launched"], result["failed"]
+                mode_id, mode_name, result["launched"], result["failed"]
             )
             logger.info(
                 f"Resultado: {len(result['launched'])} OK, "
@@ -95,7 +111,7 @@ def _handle_mode_selected(launcher: AppLauncher, ui: JarvisUI, config: ConfigMan
 
 def main() -> int:
     # Verificar instancia unica
-    if _is_already_running():
+    if not _acquire_singleton():
         logger.warning("Ya hay una instancia ejecutandose. Cerrando.")
         return 0
 
@@ -133,14 +149,10 @@ def main() -> int:
         """
     )
 
-    # Crear launcher
+    # Crear launcher y ventana principal
     launcher = AppLauncher()
-
-    # Crear ventana principal
-    handler = _handle_mode_selected(launcher, ui=None, config=config)
-    ui = JarvisUI(config._config, on_mode_selected=handler)
-    handler_ui = _handle_mode_selected(launcher, ui, config)
-    ui._on_mode_selected = handler_ui
+    ui = JarvisUI(config._config)
+    ui._on_mode_selected = _handle_mode_selected(launcher, ui, config)
 
     ui.show()
 

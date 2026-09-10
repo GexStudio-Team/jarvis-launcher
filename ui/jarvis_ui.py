@@ -7,11 +7,17 @@ Efectos visuales:
   - Linea de escaneo horizontal
   - Grid sutil de fondo
   - Texto con efecto glow
+  - Pantalla de boot animada al iniciar
+  - Greeting con efecto typewriter
+  - Flash de color del modo al seleccionar
   - Transiciones suaves entre estados
 """
 
 import math
+import os
 import random
+import sys
+from datetime import datetime
 
 from PyQt6.QtCore import (
     Qt,
@@ -23,7 +29,6 @@ from PyQt6.QtCore import (
 from PyQt6.QtGui import (
     QColor,
     QFont,
-    QFontDatabase,
     QLinearGradient,
     QRadialGradient,
     QPen,
@@ -33,14 +38,17 @@ from PyQt6.QtGui import (
 )
 from PyQt6.QtWidgets import (
     QWidget,
+    QApplication,
     QVBoxLayout,
     QHBoxLayout,
     QLabel,
     QPushButton,
-    QDesktopWidget,
     QGraphicsOpacityEffect,
 )
 
+from core.feedback import play_click, play_success, play_error
+from core.notifier import notify
+from core.state import StateManager
 from ui.mode_card import ModeCard
 
 
@@ -76,6 +84,132 @@ class Particle:
 
 
 # ======================================================================
+# Overlays (boot y flash)
+# ======================================================================
+
+
+class BootOverlay(QWidget):
+    """
+    Pantalla de carga inicial tipo arranque de sistema.
+    Texto centrado con animacion de puntos.
+    """
+
+    def __init__(self, app_name: str, version: str, parent: QWidget) -> None:
+        super().__init__(parent)
+        self.setGeometry(parent.rect())
+        self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+
+        layout = QVBoxLayout(self)
+        layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.setSpacing(12)
+
+        self._name_label = QLabel(app_name, self)
+        self._name_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._name_label.setStyleSheet(
+            """
+            QLabel {
+                color: #00FFFF;
+                font-size: 42px;
+                font-weight: bold;
+                letter-spacing: 8px;
+                background: transparent;
+            }
+            """
+        )
+        layout.addWidget(self._name_label)
+
+        self._status_label = QLabel("INICIANDO SISTEMA", self)
+        self._status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._status_label.setStyleSheet(
+            """
+            QLabel {
+                color: rgba(0, 255, 255, 150);
+                font-size: 12px;
+                letter-spacing: 4px;
+                background: transparent;
+            }
+            """
+        )
+        layout.addWidget(self._status_label)
+
+        self._time_label = QLabel(
+            datetime.now().strftime("%d %b %Y - %H:%M"), self
+        )
+        self._time_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._time_label.setStyleSheet(
+            """
+            QLabel {
+                color: rgba(255, 255, 255, 70);
+                font-size: 10px;
+                letter-spacing: 1px;
+                background: transparent;
+            }
+            """
+        )
+        layout.addWidget(self._time_label)
+
+        self._dots = 0
+        self._dots_timer = QTimer(self)
+        self._dots_timer.timeout.connect(self._animate_dots)
+        self._dots_timer.start(220)
+
+        # Efecto opacidad para el fade-out
+        self._fx = QGraphicsOpacityEffect(self)
+        self._fx.setOpacity(1.0)
+        self.setGraphicsEffect(self._fx)
+
+    def _animate_dots(self) -> None:
+        self._dots = (self._dots + 1) % 4
+        self._status_label.setText(
+            "INICIANDO SISTEMA" + "." * self._dots
+        )
+
+    def fade_out(self, on_done=None) -> None:
+        """Animacion de salida del overlay."""
+        self._dots_timer.stop()
+        anim = QPropertyAnimation(self._fx, b"opacity")
+        anim.setDuration(500)
+        anim.setStartValue(1.0)
+        anim.setEndValue(0.0)
+        anim.setEasingCurve(QEasingCurve.Type.InOutCubic)
+        if on_done:
+            anim.finished.connect(on_done)
+        anim.finished.connect(self.deleteLater)
+        anim.start()
+        self._boot_fade = anim
+
+
+class FlashOverlay(QWidget):
+    """Overlay de flash a todo color al seleccionar un modo."""
+
+    def __init__(self, color: str, parent: QWidget) -> None:
+        super().__init__(parent)
+        self.setGeometry(parent.rect())
+        self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+        self._color = QColor(color)
+        self._fx = QGraphicsOpacityEffect(self)
+        self._fx.setOpacity(0.0)
+        self.setGraphicsEffect(self._fx)
+
+    def paintEvent(self, event) -> None:
+        p = QPainter(self)
+        p.fillRect(self.rect(), self._color)
+
+    def animate(self) -> QPropertyAnimation:
+        """Flash 0 -> 0.25 -> 0 y eliminacion del widget."""
+        anim = QPropertyAnimation(self._fx, b"opacity")
+        anim.setDuration(450)
+        anim.setKeyValueAt(0.0, 0.0)
+        anim.setKeyValueAt(0.3, 0.25)
+        anim.setKeyValueAt(0.7, 0.15)
+        anim.setKeyValueAt(1.0, 0.0)
+        anim.setEasingCurve(QEasingCurve.Type.InOutQuad)
+        anim.finished.connect(self.deleteLater)
+        anim.start()
+        return anim
+
+
+# ======================================================================
 # Widget principal JARVIS
 # ======================================================================
 
@@ -94,6 +228,9 @@ class JarvisUI(QWidget):
 
     RING_SPEEDS = [0.3, -0.5, 0.8]  # grados por tick
 
+    BOOT_DURATION_MS = 1900   # duracion de la pantalla de boot
+    TYPEWRITER_MS = 18        # intervalo de "tecleo" del greeting
+
     def __init__(self, config: dict, on_mode_selected=None) -> None:
         super().__init__()
         self._config = config
@@ -107,6 +244,9 @@ class JarvisUI(QWidget):
         self._cards_opacity: float = 0.0
         self._is_launching = False
         self._launch_message = ""
+
+        # Estado de ultimos modos
+        self._state = StateManager()
 
         # Setup ventana
         self.setWindowTitle("J.A.R.V.I.S. Launcher")
@@ -129,19 +269,27 @@ class JarvisUI(QWidget):
         # Construir UI
         self._build_ui()
 
-        # Animacion de entrada
-        self._animate_entrance()
+        # Secuencia de arranque
+        self._run_boot_sequence()
 
     # ------------------------------------------------------------------
     # Inicializacion
     # ------------------------------------------------------------------
 
     def _center_on_screen(self) -> None:
-        screen = QDesktopWidget().screenGeometry()
-        w = min(1400, screen.width() - 80)
-        h = min(900, screen.height() - 80)
-        x = (screen.width() - w) // 2
-        y = (screen.height() - h) // 2
+        """
+        Centra la ventana en el monitor principal usando
+        availableGeometry (PyQt6 - no usa QDesktopWidget).
+        Soporta multi-monitor (centra en el primario).
+        """
+        screen = QApplication.primaryScreen()
+        if screen is None:
+            return
+        geo = screen.availableGeometry()
+        w = min(1400, geo.width() - 80)
+        h = min(900, geo.height() - 80)
+        x = geo.x() + (geo.width() - w) // 2
+        y = geo.y() + (geo.height() - h) // 2
         self.setGeometry(x, y, w, h)
 
     def _init_particles(self, count: int) -> None:
@@ -236,7 +384,7 @@ class JarvisUI(QWidget):
         title_layout.setContentsMargins(0, 0, 0, 0)
         title_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        self._greeting_label = QLabel(self._config.get("greeting", ""), self)
+        self._greeting_label = QLabel("", self)
         self._greeting_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._greeting_label.setWordWrap(True)
         self._greeting_label.setStyleSheet(
@@ -264,7 +412,9 @@ class JarvisUI(QWidget):
         self._mode_cards: dict[str, ModeCard] = {}
         self._create_mode_cards()
 
-        self._main_layout.addWidget(self._cards_container, alignment=Qt.AlignmentFlag.AlignCenter)
+        self._main_layout.addWidget(
+            self._cards_container, alignment=Qt.AlignmentFlag.AlignCenter
+        )
 
         # ---- Espaciador inferior ----
         self._main_layout.addStretch()
@@ -314,9 +464,84 @@ class JarvisUI(QWidget):
             )
             apps = mode_data.get("apps", [])
             card.set_app_count(len(apps))
-            card.mousePressEvent = lambda e, mid=mode_id: self._on_card_clicked(mid)
+            card.modeClicked.connect(self._on_card_clicked)
             self._mode_cards[mode_id] = card
             self._cards_layout.addWidget(card)
+
+    # ------------------------------------------------------------------
+    # Secuencia de arranque (boot + typewriter)
+    # ------------------------------------------------------------------
+
+    def _run_boot_sequence(self) -> None:
+        """Pantalla de boot, luego fade y typewriter del greeting."""
+        # Fade-in de la ventana
+        fade = QPropertyAnimation(self._opacity_effect, b"opacity")
+        fade.setDuration(600)
+        fade.setStartValue(0.0)
+        fade.setEndValue(1.0)
+        fade.setEasingCurve(QEasingCurve.Type.OutCubic)
+        fade.start()
+        self._fade_anim = fade
+
+        # Overlay de boot
+        self._boot_overlay = BootOverlay(
+            app_name=self._config.get("app_name", "J.A.R.V.I.S."),
+            version=self._config.get("version", "1.0.0"),
+            parent=self,
+        )
+        self._boot_overlay.show()
+        self._boot_overlay.raise_()
+
+        QTimer.singleShot(
+            self.BOOT_DURATION_MS,
+            lambda: self._boot_overlay.fade_out(self._start_typewriter),
+        )
+
+    def _start_typewriter(self) -> None:
+        """Anima el greeting caracter por caracter."""
+        full_text = self._config.get(
+            "greeting", "Selecciona tu modo de operacion:"
+        )
+        self._greeting_pos = 0
+
+        self._type_timer = QTimer(self)
+        self._type_timer.timeout.connect(self._type_char)
+        self._type_timer.start(self.TYPEWRITER_MS)
+
+        # Guard: si el greeting es corto, que se complete rapido
+        self._full_greeting = full_text
+        self._type_char()
+
+        self._update_status_ready()
+
+    def _type_char(self) -> None:
+        self._greeting_pos += 2
+        self._greeting_label.setText(self._full_greeting[: self._greeting_pos])
+        if self._greeting_pos >= len(self._full_greeting):
+            self._type_timer.stop()
+
+    def _update_status_ready(self) -> None:
+        """Muestra en la barra de estado el ultimo modo usado."""
+        last = self._state.get_last_mode()
+        if last is None:
+            self._status_label.setText("SISTEMA LISTO")
+            return
+
+        try:
+            at = datetime.fromisoformat(last["at"])
+            now = datetime.now(at.tzinfo)
+            delta = (now - at).total_seconds()
+            if delta < 60:
+                ago = "ahora mismo"
+            elif delta < 3600:
+                ago = f"hace {int(delta // 60)} min"
+            else:
+                ago = f"hace {int(delta // 3600)} h"
+            self._status_label.setText(
+                f"ULTIMO MODO: {last.get('name', last['id']).upper()} - {ago}"
+            )
+        except (ValueError, KeyError):
+            self._status_label.setText("SISTEMA LISTO")
 
     # ------------------------------------------------------------------
     # Interaccion
@@ -326,40 +551,67 @@ class JarvisUI(QWidget):
         """Maneja el click en una tarjeta de modo."""
         if self._is_launching:
             return
+
+        play_click()
         self._is_launching = True
         self._launch_message = ""
         self._status_label.setText(
             f"MODO {mode_id.upper()} SELECCIONADO - INICIANDO..."
         )
 
+        # Flash de color del modo
+        color = self._config.get("modes", {}).get(
+            mode_id, {}
+        ).get("color", "#00FFFF")
+        flash = FlashOverlay(color, self)
+        flash.show()
+        flash.raise_()
+        self._flash_anim = flash.animate()
+
         if self._on_mode_selected:
             self._on_mode_selected(mode_id)
 
     def set_launch_complete(
-        self, mode_name: str, launched: list[str], failed: list[str]
+        self,
+        mode_id: str,
+        mode_name: str,
+        launched: list[str],
+        failed: list[str],
     ) -> None:
-        """Callback para cuando termina el lanzamiento."""
+        """Callback cuando termina el lanzamiento de apps."""
         self._is_launching = False
+
+        # Registrar en historial
+        self._state.record_mode(mode_id, mode_name)
+
         if failed:
             self._launch_message = (
-                f"{mode_name}: {len(launched)} apps abiertas, "
+                f"{mode_name} COMPLETADO: {len(launched)} apps abiertas, "
                 f"{len(failed)} fallaron"
             )
-            self._status_label.setText(self._launch_message.upper())
+            self._status_label.setText(self._launch_message)
+            play_error()
+            notify(
+                "J.A.R.V.I.S.",
+                f"{mode_name}: {len(launched)} apps abiertas, "
+                f"{len(failed)} fallaron.",
+            )
         else:
             self._launch_message = (
-                f"{mode_name}: {len(launched)} apps abiertas correctamente"
+                f"{mode_name} COMPLETADO: {len(launched)} apps abiertas"
             )
-            self._status_label.setText(self._launch_message.upper())
+            self._status_label.setText(self._launch_message)
+            play_success()
+            notify(
+                "J.A.R.V.I.S.",
+                f"{mode_name} listo: {len(launched)} apps abiertas.",
+            )
 
     # ------------------------------------------------------------------
     # Auto-inicio
     # ------------------------------------------------------------------
 
     def _toggle_startup(self) -> None:
-        import os
-        import subprocess
-
         startup_dir = os.path.join(
             os.environ["APPDATA"],
             r"Microsoft\Windows\Start Menu\Programs\Startup",
@@ -380,7 +632,7 @@ class JarvisUI(QWidget):
                 os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                 "main.py",
             )
-            python_exe = os.sys.executable
+            python_exe = sys.executable
 
             # VBS para ocultar la ventana de consola
             vbs_content = (
@@ -396,20 +648,6 @@ class JarvisUI(QWidget):
                 self._status_label.setText(
                     "PERMISOS INSUFICIENTES - EJECUTA COMO ADMIN"
                 )
-
-    # ------------------------------------------------------------------
-    # Animaciones de entrada
-    # ------------------------------------------------------------------
-
-    def _animate_entrance(self) -> None:
-        # Fade-in principal
-        anim = QPropertyAnimation(self._opacity_effect, b"opacity")
-        anim.setDuration(1000)
-        anim.setStartValue(0.0)
-        anim.setEndValue(1.0)
-        anim.setEasingCurve(QEasingCurve.Type.OutCubic)
-        anim.start()
-        self._fade_anim = anim
 
     # ------------------------------------------------------------------
     # Timer de animacion (loop principal)
