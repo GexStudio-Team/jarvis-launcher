@@ -28,6 +28,7 @@
 - [x] v1.2.0: beam de energia a la card seleccionada
 - [x] v1.2.0: corner brackets HUD en tarjetas + halo de hover manual
 - [x] v1.2.0: boot rediseñado con barra de progreso
+- [x] v1.3.0: comando global `jarvis` en CMD/PowerShell (install_jarvis_cmd.bat)
 
 ## Pendiente
 

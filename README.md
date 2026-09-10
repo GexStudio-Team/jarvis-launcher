@@ -39,6 +39,31 @@ pip install -r requirements.txt
 python main.py
 ```
 
+## Comando global `jarvis`
+
+Instala el comando `jarvis` en el PATH de usuario para abrir el launcher
+desde **cualquier** CMD o PowerShell:
+
+```bash
+install_jarvis_cmd.bat
+```
+
+Despues de instalarlo (y abrir una ventana nueva), escribe `jarvis` desde
+cualquier directorio:
+
+```powershell
+jarvis
+```
+
+Para desinstalarlo:
+
+```bash
+install_jarvis_cmd.bat --uninstall
+```
+
+El comando usa `pythonw.exe` (abre la GUI sin ventana de consola y devuelve
+el prompt al instante).
+
 ## Configuracion de modos
 
 Edita `config.json` para personalizar los modos y las aplicaciones que se abren en cada uno:
@@ -124,6 +149,7 @@ jarvis-launcher/
 ├── state.json           # Estado/historial (generado automaticamente)
 ├── requirements.txt     # Dependencias Python
 ├── install_startup.bat  # Instalar/desinstalar auto-inicio
+├── install_jarvis_cmd.bat  # Instalar/desinstalar comando global `jarvis`
 ├── core/
 │   ├── config.py        # Gestor de configuracion
 │   ├── launcher.py      # Motor de apertura de apps
@@ -134,5 +160,6 @@ jarvis-launcher/
 │   ├── jarvis_ui.py     # Ventana principal con efectos HUD
 │   └── mode_card.py     # Tarjetas animadas de modo
 └── assets/
-    └── startup.vbs      # Script de auto-inicio Windows
+    ├── startup.vbs      # Script de auto-inicio Windows
+    └── jarvis.cmd       # Origen del comando global `jarvis`
 ```

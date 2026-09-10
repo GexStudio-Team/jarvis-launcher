@@ -6,6 +6,20 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/).
 
 ---
 
+## [1.3.0] - 2026-09-10 (America/Bogota)
+
+### Added
+- Comando global `jarvis`: `assets/jarvis.cmd` + instalador `install_jarvis_cmd.bat`
+  que copia el script a `%USERPROFILE%\bin` y lo agrega al PATH de usuario
+- Se abre cualquier ventana nueva de CMD o PowerShell y se escribe `jarvis`
+  para lanzar el launcher (usa `pythonw.exe`, sin consola y devuelve el prompt)
+
+### Fixed
+- El comando resuelve correctamente desde PowerShell y CMD (verificado con
+  reconstruccion del PATH desde el registro y lanzamiento real del proceso)
+
+---
+
 ## [1.2.0] - 2026-09-10 (America/Bogota)
 
 ### Fixed
