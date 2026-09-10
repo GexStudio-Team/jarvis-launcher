@@ -19,6 +19,14 @@ Interfaz tipo JARVIS (Iron Man) que se ejecuta al iniciar Windows y permite lanz
 - Lanzamiento de apps en hilo separado (no bloquea la UI)
 - Soporte multi-monitor (centrado en el monitor primario)
 - Resolucion automatica de apps por nombre (PATH, menu inicio, registro App Paths)
+- **Panel lateral de noticias RSS**: posicion izquierda/derecha, ancho
+  redimensionable arrastrando el borde, actualizacion automatica cada 10
+  minutos y clic en una noticia para abrirla en tu navegador
+- **Fuentes de noticias**: 10 presets (Google News, BBC Mundo, El Tiempo, El
+  Espectador, CNN en Espanol, DW, RT, Hacker News, The Verge, Wired) o pega tu
+  propia URL RSS/Atom (se valida antes de conectar)
+- **Temas de color**: 8 paletas (obsidiana, nocturno, crimson, esmeralda,
+  matriz, violeta, ambar, luz, nieve) selectables desde la rueda de ajustes ⚙
 
 ## Requisitos
 
@@ -143,25 +151,63 @@ Para desactivar, ejecuta el mismo script nuevamente.
 | `Escape` | Cerrar launcher |
 | `F11` | Alternar pantalla completa |
 
+## Noticias y temas (v1.4)
+
+### Rueda de ajustes ⚙
+
+Haz clic en la rueda **⚙** (esquina superior derecha) para abrir el panel de control:
+
+- **Tema**: elige una de las 8 paletas de color (swatches con vista previa).
+- **Panel de noticias**: activar/desactivar y elegir posición (izquierda o
+  derecha).
+- **Fuentes**: botón para abrir el conector de fuentes.
+
+### Conectar una fuente de noticias
+
+1. Abre la rueda ⚙ → **Fuentes**.
+2. Elige un preset (Google News, BBC Mundo, El Tiempo, ...) y pulsa **USAR**,
+   o pega una **URL RSS/Atom** propia y pulsa **CONECTAR** (se valida que el
+   feed sea legible antes de conectar).
+3. El panel mostrará las noticias con su antigüedad ("hace 5 min").
+
+### Redimensionar el panel
+
+Arrastra el **borde interior** del panel (cursor ⇔) para cambiar su ancho
+(280–560 px). La posición y el ancho se guardan para la próxima sesión.
+
+### Abrir una noticia
+
+Haz clic en cualquier noticia del panel: se abre en tu navegador por defecto.
+
+> Las noticias se actualizan automáticamente cada 10 minutos. Si el panel
+> queda "Sin noticias disponibles", verifica tu conexión o cambia de fuente
+> desde el conector.
+
 ## Estructura del proyecto
 
 ```
 jarvis-launcher/
 ├── main.py              # Entry point
 ├── config.json          # Configuracion de modos (edita aqui)
+├── settings.json        # Preferencias de interfaz (tema/noticias, generado automaticamente)
 ├── state.json           # Estado/historial (generado automaticamente)
 ├── requirements.txt     # Dependencias Python
 ├── install_startup.bat  # Instalar/desinstalar auto-inicio
 ├── install_jarvis_cmd.bat  # Instalar/desinstalar comando global `jarvis`
 ├── core/
-│   ├── config.py        # Gestor de configuracion
+│   ├── config.py        # Gestor de configuracion de modos
+│   ├── settings.py      # Preferencias de interfaz (tema, panel de noticias)
+│   ├── themes.py        # Paletas y gestor de temas de color
+│   ├── news.py          # Servicio de noticias RSS/Atom (stdlib)
 │   ├── launcher.py      # Motor de apertura de apps
 │   ├── state.py         # Historial de modos recientes
 │   ├── feedback.py      # Sonidos de feedback (winsound)
 │   └── notifier.py      # Notificaciones toast de Windows
 ├── ui/
 │   ├── jarvis_ui.py     # Ventana principal con efectos HUD
-│   └── mode_card.py     # Tarjetas animadas de modo
+│   ├── mode_card.py     # Tarjetas animadas de modo
+│   ├── news_panel.py    # Panel lateral de noticias
+│   └── settings_dialog.py  # Rueda de ajustes + conector de fuentes
 └── assets/
     ├── startup.vbs      # Script de auto-inicio Windows
     └── jarvis.cmd       # Origen del comando global `jarvis`

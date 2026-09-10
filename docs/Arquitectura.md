@@ -1,6 +1,6 @@
 # Arquitectura - J.A.R.V.I.S. Launcher
 
-> Estado: estable · Versión de referencia: 1.3.0 · Actualizado: 2026-09-10 (America/Bogota)
+> Estado: estable · Versión de referencia: 1.4.0 · Actualizado: 2026-09-10 (America/Bogota)
 
 ## 1. Descripción general
 
@@ -8,6 +8,8 @@
 PyQt6) que agrupa aplicaciones por modos de operación (Gaming, Trabajo, Estudio)
 con estética arcade/cyberpunk. Cada modo lanza las apps configuradas y ofrece
 retroalimentación audiovisual (sonidos sintetizados y animaciones propias).
+Incluye panel lateral de noticias RSS (presets o URL propia), temas de color
+seleccionables desde la interfaz y panel de control (rueda ⚙).
 
 ## 2. Diagrama de componentes
 
@@ -18,7 +20,10 @@ flowchart TD
     end
 
     subgraph Core["core/ (lógica de dominio)"]
-        cfg["config.py - ConfigManager<br/>(lee/escribe config.json)"]
+        cfg["config.py - ConfigManager<br/>(lee/escribe config.json - modos/apps)"]
+        set["settings.py - SettingsManager<br/>(lee/escribe settings.json - preferencias UI)"]
+        thm["themes.py - ThemeManager/Theme<br/>(paleta y temas)"]
+        nws["news.py - NewsService<br/>(RSS/Atom con stdlib)"]
         st["state.py - StateManager<br/>(persiste state.json)"]
         ln["launcher.py - AppLauncher<br/>(resuelve y lanza apps)"]
         fb["feedback.py - sonidos (winsound.Beep)"]
@@ -27,21 +32,28 @@ flowchart TD
 
     subgraph UI["ui/ (presentación PyQt6)"]
         ui_main["jarvis_ui.py - JarvisUI / BootOverlay / FlashOverlay"]
-        cards["mode_card.py - ModeCard<br/>(halo y highlight pintados manualmente)"]
+        cards["mode_card.py - ModeCard<br/>(paint 100% custom)"]
+        np["news_panel.py - NewsPanel / NewsItemWidget / EmptyNewsView"]
+        sd["settings_dialog.py - SettingsDialog / ConnectDialog"]
     end
 
     main --> cfg
+    main --> set
     main --> st
     main --> ui_main
 
     ui_main --> cards
+    ui_main --> np
+    ui_main --> sd
     ui_main --> fb
     ui_main --> ln
     ui_main --> nt
 
     cfg -.-> config_json["config.json (raíz)"]
+    set -.-> settings_json["settings.json (raíz, .gitignore)"]
     st -.-> state_json["state.json (raíz, .gitignore)"]
     ln --> proc["Procesos externos: apps + archivos + URLs"]
+    nws -.-> feeds["Feeds RSS/Atom externos (https)"]
 ```
 
 ## 3. Módulos y responsabilidades
@@ -50,7 +62,36 @@ flowchart TD
 - **Entry point** de la aplicación.
 - Garantiza instancia única mediante un socket local en el puerto `47821`
   (si el puerto está ocupado, notifica y sale).
-- Crea `ConfigManager`, `AppLauncher` y `JarvisUI`, y ejecuta el bucle de eventos.
+- Crea `ConfigManager`, `SettingsManager`, `AppLauncher` y `JarvisUI`, inyecta
+  `settings` a la UI y ejecuta el bucle de eventos.
+
+### `core/settings.py` — `SettingsManager`
+- Persiste las **preferencias de interfaz** del usuario en `settings.json`
+  (raíz, excluido de git vía `.gitignore`).
+- Claves: `theme` (id del tema), `news.enabled`, `news.position`
+  (`left`/`right`), `news.width`, `news.sources` (lista `{name, url}`).
+- Migración de claves antiguas al leer; `save()` con `indent=4` UTF-8.
+- Ver también: [ADR-004](./ADR-004-temas-thememanager.md).
+
+### `core/themes.py` — `ThemeManager` / `Theme`
+- `Theme` (dataclass frozen): paleta completa (bg, bg_alt, text, text_dim,
+  accent, accent_soft, card_border, grid, scan, ring_outer/mid/inner) + flags
+  `is_dark`, `is_obsidian`.
+- `ThemeManager`: resuelve por id, lista de temas disponibles y helper
+  estático `rgba(color, alpha)` → `QColor` (evita constructores inválidos
+  `QColor("#hex", n)` de Qt6).
+- 8 temas: obsidiana (clásico), nocturno, crimson, esmeralda, matriz,
+  violeta, ámbar, luz, nieve.
+- Ver también: [ADR-004](./ADR-004-temas-thememanager.md).
+
+### `core/news.py` — `NewsService`
+- Descarga feeds RSS 2.0 / Atom con `urllib.request` y parsea con
+  `xml.etree.ElementTree` (**solo stdlib, sin dependencias nuevas**).
+- `NewsItem`: título, enlace, fuente, fecha (`datetime` aware UTC) y
+  `time_ago()` para la UI.
+- `PRESET_SOURCES`: 10 fuentes predefinidas; soporta URL propia (validación
+  con lectura real del feed).
+- Ver también: [ADR-005](./ADR-005-panel-noticias-rss.md).
 
 ### `core/config.py` — `ConfigManager`
 - Carga/valida `config.json`; si no existe, lo crea con `DEFAULT_CONFIG`.
@@ -92,24 +133,54 @@ flowchart TD
 
 ### `ui/jarvis_ui.py`
 - `JarvisUI` (QWidget a pantalla completa, frameless):
-  - Fondo obsidiana + partículas + núcleo vibrante.
+  - Layout compacto: barra superior (logo, ruedita ⚙, auto-inicio, cerrar),
+    título, tarjetas centradas, barra de estado y **panel de noticias lateral**.
+  - Temas consumidos vía `ThemeManager`; `apply_theme()` re-pinta fondos
+    (grid, partículas, anillos HUD, scan, beam, vignette) y estilos QSS.
   - Saludo con efecto máquina de escribir (typewriter).
   - Beam de energía del núcleo hacia la tarjeta seleccionada.
   - Selección con teclado (flechas + Enter) y ratón.
+  - `open_settings()` abre el panel de control (rueda ⚙).
   - Fade de entrada/salida con `windowOpacity` (nativa, no `QGraphicsOpacityEffect`).
 - `BootOverlay` / `FlashOverlay`: overlays con propiedades `fade` / `alpha`
   animadas vía `QPropertyAnimation`; pintura manual en `paintEvent`.
-- Ver también: [ADR-001](./ADR-001-quitar-qgraphicseffect.md).
+- Ver también: [ADR-001](./ADR-001-quitar-qgraphicseffect.md),
+  [ADR-004](./ADR-004-temas-thememanager.md).
 
 ### `ui/mode_card.py` — `ModeCard`
-- Tarjeta de modo con borde neon (color del modo), icono, nombre y descripción.
+- Tarjeta de modo con **pintura 100% custom** en `paintEvent` (sin QLabels).
 - Estados **normal / hover / seleccionada**:
-  - Hover: halo brillante alrededor de la tarjeta (pintado manualmente).
-  - Seleccionada: highlight de relleno + brackets de esquina (HUD).
-- El resplandor difuso se difumina con un degradado radial propio (con
-  `QRadialGradient`), **sin** `QGraphicsDropShadowEffect` (arregla tarjetas
-  negras y spam de QPainter).
+  - Hover: halo brillante alrededor de la tarjeta (pintado manualmente) +
+    zoom sutil (~1.045) del contenido.
+  - Seleccionada: sweep beam + corner brackets (HUD) + contador de apps.
+- **Icono flotante**: posición del icono animada con QTimer (~30 fps) para el
+  efecto "hovering" sin gastar CPU en repintados continuos de la tarjeta.
+- **Entrada escalonada**: `play_entrance(delay)` anima altura + fade de cada
+  tarjeta con `QPropertyAnimation`.
+- Sin `QGraphicsDropShadowEffect` (arregla tarjetas negras y spam de QPainter).
 - Ver también: [ADR-001](./ADR-001-quitar-qgraphicseffect.md).
+
+### `ui/news_panel.py` — `NewsPanel`
+- `NewsPanel` (QFrame) lateral: posición (izq/der según `settings`), ancho
+  280–560 px redimensionable **arrastrando el borde interior** (handle 10 px).
+- Descarga en hilo daemon → entrega al hilo UI vía señal `_itemsFetched`
+  (nunca se tocan widgets desde el hilo de trabajo).
+- Refresh automático cada 10 min + botón manual; timer y estados visibles.
+- `NewsItemWidget`: animación de entrada (crece altura + fade, insert arriba
+  → el resto baja), hover resaltado, **clic abre la noticia** en el navegador.
+- `EmptyNewsView`: estado desconectado con botón CONECTAR (emite
+  `configureRequested` → abre `ConnectDialog`).
+- Ver también: [ADR-005](./ADR-005-panel-noticias-rss.md).
+
+### `ui/settings_dialog.py` — `SettingsDialog` / `ConnectDialog`
+- `SettingsDialog` (modal, rueda ⚙): selector de tema con **swatches**,
+  activar/desactivar panel de noticias, posición (izquierda/derecha), botones
+  APLICAR / CANCELAR.
+- `ConnectDialog` (modal): presets `PRESET_SOURCES` en scroll + campo de URL
+  RSS/Atom personalizada con **validación en hilo daemon**; el resultado
+  vuelve al hilo principal por la señal `validationDone(bool, str)` (no usa
+  `QMetaObject.invokeMethod` con kwargs, inválido en PyQt6).
+- Ver también: [ADR-005](./ADR-005-panel-noticias-rss.md).
 
 ## 4. Flujo de información (ciclo principal)
 
@@ -118,23 +189,28 @@ sequenceDiagram
     participant U as Usuario
     participant W as JarvisUI
     participant C as ConfigManager
+    participant S as SettingsManager
+    participant N as NewsPanel
     participant L as AppLauncher
-    participant S as StateManager
+    participant ST as StateManager
     participant F as feedback
-    participant N as notifier
+    participant NT as notifier
 
     W->>W: BootOverlay (barra de progreso + fade)
     W->>C: lee greeting y modos
-    W->>W: pinta cards + typewriter
+    W->>S: lee tema, posición/ancho del panel
+    W->>W: pinta cards + typewriter (tema activo)
+    W->>N: refresh (hilo daemon, señal _itemsFetched)
+    N-->>W: items (del hilo de trabajo al hilo UI)
     U->>W: hover en tarjeta
-    W->>W: halo + highlight (pintado manual)
+    W->>W: halo + zoom (pintado manual)
     U->>W: click / Enter
     W->>F: play_click()
     W->>W: FlashOverlay + beam de energía
     W->>L: launch_mode(modo) [hilo daemon]
-    W->>S: record_mode(id, name)
+    W->>ST: record_mode(id, name)
     W->>F: play_success() / play_error()
-    W->>N: notify("J.A.R.V.I.S.", resultado)
+    W->>NT: notify("J.A.R.V.I.S.", resultado)
     W-->>U: fade de salida (windowOpacity)
 ```
 
@@ -154,9 +230,12 @@ sequenceDiagram
 ## 6. Seguridad y operación
 
 - El socket singleton usa el puerto local `47821`; no expone servicios de red.
+- Las fuentes RSS se descargan por HTTPS con timeout acotado; la URL
+  personalizada se valida leyendo el feed real (sin ejecutar código externo).
 - Los lanzamientos externos respetan las rutas del sistema operativo; el
   usuario es responsable de las apps configuradas en `config.json`.
-- `state.json` es estado local de usuario y **no se versiona** (`.gitignore`).
+- `state.json` y `settings.json` son estado/preferencias locales y **no se
+  versionan** (`.gitignore`).
 
 ## 7. Trabajo pendiente y deuda técnica (TODO)
 
@@ -164,10 +243,14 @@ Fuente viva de pendientes: [`TODO.md` raíz](../TODO.md).
 
 Resumen de categorías vigentes (verificado al 2026-09-10):
 
+- **Temas**: soporte de tema claro con contraste verificado en todo el paint
+  custom; editor visual de paletas.
+- **Noticias**: soporte JSON Feed; caché offline de items; filtro por
+  categoría/idioma.
+- **Panel de control**: editor gráfico de modos (agregar/quitar apps desde la
+  UI) integrado con la rueda ⚙.
 - **Ventana**: prueba de pantalla completa real; posición secundaria de la
   ventana en monitores múltiples.
-- **Retroalimentación**: variar velocidad del typewriter; sonido más suave al hacer
-  hover; fallback escaneo de apps por instalación estándar (Steam/Epic).
 - **Rendimiento**: revisar el uso de CPU del core/beam en pantallas grandes.
 - **Pruebas**: verificación de toasts de Windows 10/11; prueba en máquina
   limpia (sin PySide6) del flujo de instalación.

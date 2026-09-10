@@ -6,6 +6,51 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/).
 
 ---
 
+## [1.4.0] - 2026-09-10 (America/Bogota)
+
+### Added
+- `core/settings.py` (`SettingsManager`): preferencias de interfaz del usuario
+  en `settings.json` separado de `config.json` (tema, estado/posición/ancho del
+  panel de noticias y fuentes RSS); `settings.json` excluido de git
+- `core/themes.py` (`Theme` + `ThemeManager`): sistema de temas de color con 8
+  paletas (obsidiana, nocturno, crimson, esmeralda, matriz, violeta, ambar,
+  luz, nieve) y helper `rgba()` para construir `QColor` con alpha
+- `core/news.py` (`NewsService`): descarga/parseo de feeds RSS 2.0 y Atom con
+  solo la biblioteca estándar (sin dependencias nuevas); 10 fuentes
+  predefinidas + URL RSS/Atom personalizada; fechas normalizadas a UTC aware
+- `ui/news_panel.py` (`NewsPanel`): panel lateral de noticias con posición
+  izquierda/derecha, ancho redimensionable por el borde (280–560 px), refresh
+  automático cada 10 min, descarga en hilo separado (señal a la UI),
+  animación de entrada por tarjeta y apertura de la noticia en el navegador al
+  hacer clic; estado desconectado con botón CONECTAR
+- `ui/settings_dialog.py` (`SettingsDialog`): rueda ⚙ con selector de tema
+  (swatches), activación y posición del panel de noticias; `ConnectDialog`
+  modal con presets y URL personalizada con validación en hilo
+- `ui/mode_card.py`: tarjeta con pintura 100% custom, icono flotante animado,
+  zoom en hover, sweep de selección, brackets de esquina y entrada escalonada
+- `ui/jarvis_ui.py`: layout compacto sin huecos grandes (barra superior,
+  título, tarjetas, estado y panel lateral), temas en caliente en todos los
+  fondos HUD, rueda de ajustes integrada
+- Docs: `docs/ADR-004-temas-thememanager.md` y
+  `docs/ADR-005-panel-noticias-rss.md`; `docs/Arquitectura.md` actualizada con
+  los nuevos módulos y flujos
+
+### Fixed
+- Crash nativo al iniciar en Qt6 por constructores inválidos
+  `QColor("#hex", alpha)` en overlays y grid (reemplazados por
+  `ThemeManager.rgba`)
+- `ConnectDialog`: la validación de URL usaba `QMetaObject.invokeMethod` con
+  kwargs (API inválida en PyQt6); se reemplazó por la señal Qt propia
+  `validationDone(bool, str)` con entrega segura al hilo principal
+
+### Changed
+- `ui/mode_card.py` dejó de usar sub-widgets para el contenido: todo el estado
+  visual se pinta en `paintEvent` (más liviano y sin conflictos de painter)
+- `main.py` ahora inyecta `SettingsManager` a `JarvisUI`
+- `.gitignore` excluye `settings.json` (preferencias locales del usuario)
+
+---
+
 ## [Unreleased]
 
 ### Added
