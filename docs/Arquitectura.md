@@ -53,6 +53,7 @@ flowchart TD
         ui_main["jarvis_ui.py - JarvisUI / BootOverlay / FlashOverlay"]
         cards["mode_card.py - ModeCard<br/>(paint 100% custom, monograma)"]
         np["news_panel.py - NewsPanel / NewsItemWidget / EmptyNewsView"]
+        rd["news_reader.py - NewsReaderView / MiniNewsItem<br/>(lector fullscreen - split-pane)"]
         sd["settings_dialog.py - SettingsDialog / ConnectDialog / GithubDialog"]
     end
 
@@ -64,6 +65,7 @@ flowchart TD
     ui_main --> cards
     ui_main --> np
     ui_main --> sd
+    ui_main --> rd
     ui_main --> fb
     ui_main --> ln
     ui_main --> nt
@@ -71,6 +73,8 @@ flowchart TD
     ui_main --> tr
     ui_main --> gr
     ui_main --> gl
+
+    np -. "readerRequested(items, index)" .-> rd
 
     cfg -.-> config_json["config.json (raíz)"]
     set -.-> settings_json["settings.json (raíz, .gitignore)"]
@@ -251,10 +255,29 @@ flowchart TD
 - **Jerarquía limpia v2**: cabecera "¿QUÉ ESTÁ PASANDO EN EL MUNDO AHORA?";
   cada `NewsItemWidget` muestra fuente + hora en dim, título destacado de 2
   líneas y preview del resumen (si el feed lo incluye); hover resaltado y
-  **clic abre la noticia** en el navegador.
+  **clic emite `readerRequested(items, index)`** para abrir el lector de
+  artículos (`NewsReaderView`), que mantiene el enlace original.
 - `EmptyNewsView`: estado vacío sobrio ("◉") con botón CONFIG (emite
   `configureRequested` → abre `ConnectDialog`).
-- Ver también: [ADR-005](./ADR-005-panel-noticias-rss.md).
+- Ver también: [ADR-005](./ADR-005-panel-noticias-rss.md),
+  [ADR-007](./ADR-007-lector-noticias.md).
+
+### `ui/news_reader.py` — `NewsReaderView`
+- **Lector de noticias a pantalla completa** (spec v2 pts. 3-4), hijo overlay
+  de `JarvisUI` (mismo patrón que `BootOverlay`): `setGeometry(parent.rect())`
+  + `raise_()`; fade de entrada con `windowOpacity` (ADR-001).
+- **Split-pane redimensionable** (`QSplitter` horizontal, handle estilizado
+  del tema): lista compacta izquierda (`MiniNewsItem`, 180–380 px) + lectura
+  larga derecha (`QTextBrowser`); columna centrada ~760 px.
+- **Contenido desde el feed** (decisión B3 del ADR-007): `extra["summary"]`
+  dividido por `_split_readable()` en lead (2 oraciones), pull-quote (primera
+  oración) y cuerpo; **capitular** en acento y cita en cursiva con barra
+  lateral; si no hay resumen, aviso neutro + botón **"Abrir original ↗"**
+  (`webbrowser.open`) como camino principal.
+- HTML generado con los colores del `ThemeManager` activo (`set_theme`);
+  navegación `←`/`→` y `Escape` (señal `closeRequested`); scroll arriba al
+  cambiar de artículo.
+- Ver también: [ADR-007](./ADR-007-lector-noticias.md).
 
 ### `ui/settings_dialog.py` — `SettingsDialog` / `ConnectDialog` / `GithubDialog`
 - `SettingsDialog` (modal, rueda ⚙): **lista estructurada v2** con filas
@@ -288,6 +311,7 @@ sequenceDiagram
     participant C as ConfigManager
     participant S as SettingsManager
     participant N as NewsPanel
+    participant R as NewsReaderView
     participant L as AppLauncher
     participant ST as StateManager
     participant F as feedback
@@ -304,6 +328,13 @@ sequenceDiagram
     W->>W: pinta cards + typewriter (tema activo)
     W->>N: refresh (hilo daemon, señal _itemsFetched)
     N-->>W: items (del hilo de trabajo al hilo UI)
+    U->>N: click en una noticia
+    N-->>W: readerRequested(items, index)
+    W->>R: _open_reader(items, index) → show + fade (fullscreen)
+    R-->>U: lectura larga (lead/pull-quote/cuerpo)
+    U->>R: ← / → cambian articulo; clic en lista
+    U->>R: Escape → closeRequested
+    R-->>W: _close_reader() → hide, vuelve al launcher
     U->>W: hover en tarjeta
     W->>W: halo + zoom (pintado manual)
     U->>W: click / Enter
@@ -312,9 +343,7 @@ sequenceDiagram
     W->>H: hide() tras 700 ms (deja al frente las apps)
     W->>L: launch_mode(modo) [hilo daemon]
     W->>ST: record_mode(id, name)
-    W->>F: play_success() / play_error()
     W->>NT: notify("J.A.R.V.I.S.", resultado)
-    W-->>U: el launcher queda en bandeja (tray enabled)
     U->>H: Ctrl+Shift+Espacio (cualquier app)
     H-->>W: signal activated → toggle_visibility()
     U->>TR: clic/doble clic en icono de bandeja
@@ -354,9 +383,11 @@ Resumen de categorías vigentes (verificado al 2026-09-11):
   offscreen; falta validación interactiva en Windows real (mensaje `WM_HOTKEY`
   y notificaciones de bandeja). Probar sin conflictos con otro proceso usando
   `Ctrl+Shift+Espacio` (el registro fallido se loguea como advertencia).
-- **Lector de noticias v2** (spec puntos 3 y 4): vista a pantalla completa con
-  ancho redimensionable/split, tipografía de lectura larga, lead/pull-quote y
-  hooks — en rama `feat/news-reader` (pendiente).
+- **Lector de noticias v2** (spec puntos 3 y 4): implementado en
+  `ui/news_reader.py` (split-pane, lectura larga, "Abrir original"); la
+  validación visual final en pantalla real queda pendiente. Deuda técnica
+  registrada en ADR-007: el cuerpo offline completo requeriría un extractor de
+  contenido de la URL del artículo (dependencia nueva, fuera de esta fase).
 - **Temas**: soporte de tema claro con contraste verificado en todo el paint
   custom; editor visual de paletas.
 - **Noticias**: soporte JSON Feed; caché offline de items; filtro por

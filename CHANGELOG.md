@@ -6,6 +6,43 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/).
 
 ---
 
+## [Unreleased]
+
+### Added
+- `ui/news_reader.py` (`NewsReaderView`): **lector de noticias a pantalla
+  completa** (spec v2 puntos 3 y 4) que se abre al hacer clic en una noticia
+  del panel:
+  - **Split-pane redimensionable** (`QSplitter`, estilo `QSplitter::handle`)
+    con lista compacta a la izquierda (título + fuente/hora, artículo actual
+    resaltado) y lectura larga a la derecha
+  - **Tipografía de lectura larga**: columna centrada (~760 px), título en
+    Georgia 26 px, meta fuente·hora en dim, **lead destacado con capitular**
+    (primera letra en acento), **pull-quote** del resumen en cursiva con barra
+    lateral de acento y divisores tipográficos
+  - **Contenido del feed** (`extra["summary"]`) dividido en lead / cita / cuerpo
+    con `_split_readable()`; cuando el feed no trae resumen, muestra un aviso
+    y el botón **"Abrir original ↗"** (navegador) queda como camino principal
+  - Navegación por teclado: `←`/`→` cambian de artículo y `Escape` vuelve al
+    launcher; click en la lista también navega; fade de entrada con
+    `windowOpacity` (sin `QGraphicsEffect`, ADR-001)
+
+### Changed
+- `ui/news_panel.py`: el clic en una noticia ahora emite
+  `readerRequested(items, index)` y **abre el lector** (`NewsReaderView`)
+  en lugar de saltar directamente al navegador (el enlace original sigue
+  disponible dentro del lector); se mantiene `configureRequested` para el
+  conector de fuentes y se elimina el uso de `webbrowser` en el panel
+- `ui/jarvis_ui.py`: integra `NewsReaderView` bajo demanda
+  (`_open_reader` / `_close_reader`), conecta `readerRequested`, prioriza los
+  atajos del lector en `keyPressEvent` y aplica el tema vivo al abrir
+
+### Docs
+- `docs/ADR-007-lector-noticias.md` (decisión del lector: split-pane + contenido
+  del feed + "Abrir original"); `docs/Arquitectura.md` y `README.md`
+  actualizados con el nuevo módulo y flujo
+
+---
+
 ## [2.0.0] - 2026-09-11 (America/Bogota)
 
 ### Added

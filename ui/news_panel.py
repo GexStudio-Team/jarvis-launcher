@@ -8,7 +8,9 @@ Rediseno v2 (modo workspace):
     titulo destacado, preview de 2 lineas reservado bajo el titulo.
   - Estado vacio sin emojis grandes: mensaje sobrio + boton CONECTAR.
   - Panel lateral redimensionable arrastrando su borde; refresco automatico
-    cada 10 minutos y manual (boton); click en noticia -> navegador.
+    cada 10 minutos y manual (boton); click en noticia -> abre el lector de
+    articulos a pantalla completa (ui/news_reader.py), que mantiene el enlace
+    original ("Abrir original").
 
 Estructura
 ----------
@@ -25,7 +27,6 @@ segun ADR-001).
 from __future__ import annotations
 
 import threading
-import webbrowser
 from datetime import datetime
 
 from PyQt6.QtCore import (
@@ -277,7 +278,7 @@ class NewsItemWidget(QFrame):
         p.end()
 
     # ------------------------------------------------------------------
-    # Click -> abrir en navegador
+    # Click -> emitir item (el launcher abre el lector de articulos)
     # ------------------------------------------------------------------
 
     def mousePressEvent(self, event) -> None:
@@ -379,10 +380,13 @@ class NewsPanel(QFrame):
     -------
     configureRequested : pide abrir el dialogo de conexion de fuentes.
     widthChanged : al redimensionar por borde (avisa al layout padre).
+    readerRequested : (list[NewsItem], int) al pulsar una noticia -> abre el
+        lector de articulos (news_reader.py) en lugar del navegador directo.
     """
 
     configureRequested = pyqtSignal()
     widthChanged = pyqtSignal(int)
+    readerRequested = pyqtSignal(object, int)   # (items, index)
     _itemsFetched = pyqtSignal(object)   # list[NewsItem] desde hilo
 
     RESIZE_HANDLE = 6  # px del borde arrastrable
@@ -671,9 +675,11 @@ class NewsPanel(QFrame):
                 w.deleteLater()
 
         # Insertar nuevos: top-down con entrada escalonada
+        self._current_items: list[NewsItem] = []
         for idx, item in enumerate(items[:20]):
             w = NewsItemWidget(item, self._theme, self._list_container)
             w.itemClicked.connect(self._open_item)
+            self._current_items.append(item)
             self._list_layout.insertWidget(idx, w)
             w.play_entrance(delay_ms=min(idx * 40, 800), duration=360)
 
@@ -687,8 +693,10 @@ class NewsPanel(QFrame):
         self._set_connected()
 
     def _open_item(self, item: NewsItem) -> None:
-        if item.url:
-            webbrowser.open(item.url)
+        """Click en noticia -> pide abrir el lector (news_reader, spec v2)."""
+        items = getattr(self, "_current_items", [])
+        index = items.index(item) if item in items else 0
+        self.readerRequested.emit(list(items), index)
 
     # Eventos de redimension: mantener footer/estado vacio posicionados
     def resizeEvent(self, event) -> None:

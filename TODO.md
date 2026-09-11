@@ -55,10 +55,17 @@
 - [x] v2: pruebas offscreen (render UI, tarjetas, noticias, dialogo ajustes, boot completo) 0 errores
 - [x] v2: push main -> origin/main (cce3112)
 - [x] v2: docs actualizadas — CHANGELOG [2.0.0], README (caracteristicas/atajos/estructura), Arquitectura.md (modulos v2, flujo), ADR-006 (atajo global + bandeja), config.json -> 2.0.0
+- [x] v2: `ui/news_reader.py` — NewsReaderView lector fullscreen split-pane (lista izq + lectura larga der, QSplitter) + MiniNewsItem
+- [x] v2: tipografia lectura larga — columna centrada, titulo Georgia, lead con capitular, pull-quote cursiva, divisores; HTML del tema activo
+- [x] v2: click en noticia del panel emite `readerRequested` y abre el lector; boton "Abrir original" en navegador cuando el feed no trae cuerpo
+- [x] v2: atajos del lector (Escape cierra, flechas navegan) priorizados en JarvisUI; fade windowOpacity (ADR-001)
+- [x] v2: tests offscreen lector (render, splitter, navegacion, temas, respaldo sin summary) + integracion con JarvisUI 0 errores
+- [x] v2: docs ADR-007 (lector), Arquitectura (news_reader + flujo), CHANGELOG [Unreleased], README
 
 ## En progreso
 
-- [ ] Rama `feat/news-reader`: lector de noticias del punto 3 y 4 del diseno v2 (vista redimensionable, lead/pull-quote/lectura larga)
+- [ ] Merge de `feat/news-reader` a `main` vía PR (propuesta entregada, pendiente de aprobacion y creacion)
+- [ ] Release GitHub v2.0.0 + tag (pendiente de la creacion del PR)
 
 ## Pendiente
 

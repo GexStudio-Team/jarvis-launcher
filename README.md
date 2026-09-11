@@ -41,6 +41,11 @@ Interfaz tipo JARVIS (Iron Man) que se ejecuta al iniciar Windows y permite lanz
 - **Panel de control estructurado**: lista por secciones (Apariencia,
   Comportamiento, Noticias, Cuenta de GitHub, Próximamente) con auto-inicio y
   bandeja configurables
+- **Lector de noticias a pantalla completa**: haz clic en cualquier noticia del
+  panel para leerla sin salir del launcher — lista lateral para cambiar de
+  artículo al instante, tipografía de lectura larga (lead destacado, cita en
+  cursiva) y botón **Abrir original** para ver el artículo completo en tu
+  navegador
 
 ## Requisitos
 
@@ -196,7 +201,15 @@ Arrastra el **borde interior** del panel (cursor ⇔) para cambiar su ancho
 
 ### Abrir una noticia
 
-Haz clic en cualquier noticia del panel: se abre en tu navegador por defecto.
+Haz clic en cualquier noticia del panel: se abre el **lector de noticias** a
+pantalla completa dentro del launcher.
+
+- A la **izquierda** tienes la lista de noticias: haz clic para cambiar de
+  artículo al instante (también con las flechas `←` / `→`).
+- A la **derecha** lees el artículo con tipografía de lectura larga (resumen
+  del feed con lead destacado y cita).
+- Usa **`Escape`** (o el botón **← VOLVER**) para regresar al launcher.
+- Si quieres el artículo completo en tu navegador, pulsa **ABRIR ORIGINAL ↗**.
 
 > Las noticias se actualizan automáticamente cada 10 minutos. Si el panel
 > queda "Sin noticias disponibles", verifica tu conexión o cambia de fuente
@@ -230,6 +243,7 @@ jarvis-launcher/
 │   ├── jarvis_ui.py     # Ventana principal con efectos HUD
 │   ├── mode_card.py     # Tarjetas workspace de modo (monograma)
 │   ├── news_panel.py    # Panel lateral de noticias
+│   ├── news_reader.py   # Lector de noticias fullscreen (split-pane)
 │   └── settings_dialog.py  # Panel de control estructurado + GitHub/Connect
 └── assets/
     ├── startup.vbs      # Script de auto-inicio Windows
