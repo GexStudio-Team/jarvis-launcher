@@ -1,16 +1,19 @@
 """
-ui/jarvis_ui.py - Ventana principal del Jarvis Launcher (v1.4).
+ui/jarvis_ui.py - Ventana principal del Jarvis Launcher (v2 workspace).
 
-Cambios de la v1.4 (temas del usuario):
-  1. Layout reorganizado: sin huecos grandes. El espacio se reparte entre
-     el area central (titulo + cards + estado) y el panel lateral de
-     noticias (izq/der segun SettingsManager).
-  2. Cards rediseñadas (ver mode_card.py): icono flotante, zoom hover,
-     barrido al seleccionar, entrada escalonada.
-  3. Panel de noticias lateral conectar/conectado + redimension por borde
-     (ver news_panel.py) y ruedita de ajustes (settings_dialog.py).
-  4. Temas de color configurables (core/theme_manager): obsidiana, nocturno,
-     crimson, esmeralda, matriz, violeta, ambar, luz, nieve.
+Cambios de la v2 (modo foco / workspace, solicitud del usuario):
+  1. Comportamiento de ventana: el launcher queda SIEMPRE al frente
+     (z-order + foco), se oculta al elegir un modo (deja la vista al
+     frente) y se invoca desde cualquier app con el atajo global
+     Ctrl+Shift+Espacio (core/hotkey.py) o desde la bandeja
+     (core/tray.py). El ✕ ahora oculta a bandeja en lugar de cerrar.
+  2. Saludo dinamico: por franja horaria + adjetivo rotativo por arranque
+     (core/greeting.py) o el NOMBRE REAL del usuario cuando la cuenta de
+     GitHub esta vinculada (core/github_link.py).
+  3. Panel de noticias rediseñado con la cabecera "¿Qué está pasando en
+     el mundo ahora?" (ver news_panel.py).
+  4. Cards en modo workspace sobrio (ver mode_card.py): monograma en vez
+     de emoji gigante. Los modos (Gaming/Trabajo/Estudio) se CONSERVAN.
 
 Se mantienen las restricciones del ADR-001: sin QGraphicsEffect
 (QGraphicsOpacityEffect / QGraphicsDropShadowEffect). Fades con windowOpacity
@@ -51,10 +54,13 @@ from PyQt6.QtWidgets import (
 )
 
 from core.feedback import play_click, play_success, play_error
+from core.greeting import ADJECTIVES, greeting_for
+from core.hotkey import GlobalHotkey
 from core.notifier import notify
 from core.state import StateManager
 from core.themes import ThemeManager
 from core.settings import SettingsManager
+from core.tray import Tray
 from ui.mode_card import ModeCard
 from ui.news_panel import NewsPanel
 from ui.settings_dialog import SettingsDialog, ConnectDialog
@@ -289,6 +295,7 @@ class JarvisUI(QWidget):
         self._on_mode_selected = on_mode_selected
         self._settings = settings or SettingsManager()
         self._theme = ThemeManager(self._settings.theme)
+        self._force_quit = False  # True solo cuando se sale de verdad desde la bandeja
 
         # Estado animacion
         self._ring_angles = [0.0, 45.0, 90.0]
@@ -323,7 +330,74 @@ class JarvisUI(QWidget):
 
         self._apply_theme_particles()
         self._build_ui()
+        self._setup_system_integration()
         self._run_boot_sequence()
+
+    # ------------------------------------------------------------------
+    # Integracion con el sistema (bandeja + atajo global + z-order)
+    # ------------------------------------------------------------------
+
+    def _setup_system_integration(self) -> None:
+        """Bandeja del sistema, atajo global y foco diactivo al abrir."""
+
+        # Bandeja: vive en background, doble click o menu la traen al frente
+        self._tray = Tray(
+            on_show=self.show_and_raise,
+            on_quit=self.quit_app,
+            accent=self._theme.theme.accent,
+        )
+        self._tray.show()
+
+        # Atajo global Ctrl+Shift+Espacio: convoca/oculta el launcher
+        self._hotkey = GlobalHotkey(self.toggle_visibility)
+        app = QApplication.instance()
+        if app is not None:
+            app.installNativeEventFilter(self._hotkey)
+            self._hotkey.register()
+
+    def show_and_raise(self) -> None:
+        """Muestra la ventana forzando que quede al frente y con foco."""
+        self.show()
+        self.raise_()
+        self.activateWindow()
+        if self.isMinimized():
+            self.showNormal()
+
+    def toggle_visibility(self) -> None:
+        """Atajo global: alterna mostrar/ocultar (sin cerrar)."""
+        if self.isVisible():
+            self.hide()
+        else:
+            self.show_and_raise()
+
+    def quit_app(self) -> None:
+        """Salida real desde la bandeja (desregistra atajo y cierra)."""
+        self._force_quit = True
+        try:
+            self._hotkey.unregister()
+            app = QApplication.instance()
+            if app is not None:
+                app.removeNativeEventFilter(self._hotkey)
+        except Exception:  # pragma: no cover
+            pass
+        self._tray.hide()
+        app.quit() if (app := QApplication.instance()) is not None else None
+
+    # ------------------------------------------------------------------
+    # Ocultar a bandeja en vez de cerrar (opcion C del diseno)
+    # ------------------------------------------------------------------
+
+    def closeEvent(self, event) -> None:
+        """Al pulsar ✕ se oculta a la bandeja en lugar de salir (si esta activa)."""
+        if self._force_quit or not self._settings.tray_enabled:
+            event.accept()
+            return
+        event.ignore()
+        self.hide()
+        notify(
+            "J.A.R.V.I.S.",
+            "Sigue en la bandeja. Atajo global: Ctrl+Shift+Espacio.",
+        )
 
     # ------------------------------------------------------------------
     # Geometria
@@ -560,6 +634,31 @@ class JarvisUI(QWidget):
         dlg = SettingsDialog(self._settings, self._theme, self)
         dlg.exec()
 
+    def refresh_greeting(self) -> None:
+        """Re-escribe el saludo con el nombre real recien vinculado (GitHub)."""
+        self._full_greeting = self._build_greeting()
+        self._greeting_label.setText(self._full_greeting)
+
+    def toggle_startup(self) -> None:
+        """Publico para el dialogo de ajustes (auto-inicio)."""
+        had_auto = self._startup_configured()
+        self._toggle_startup()
+        if had_auto != self._startup_configured():
+            self._status_label.setText(
+                "AUTO-INICIO ACTIVADO" if self._startup_configured()
+                else "AUTO-INICIO DESACTIVADO"
+            )
+
+    def _startup_configured(self) -> bool:
+        startup_dir = os.path.join(
+            os.environ["APPDATA"],
+            r"Microsoft\Windows\Start Menu\Programs\Startup",
+        )
+        return any(
+            os.path.exists(os.path.join(startup_dir, f))
+            for f in ("JarvisLauncher.vbs", "JarvisLauncher.bat")
+        )
+
     def _open_connect_dialog(self) -> None:
         play_click()
         dlg = ConnectDialog(self._settings, self._theme, self)
@@ -582,6 +681,7 @@ class JarvisUI(QWidget):
         self._apply_theme_particles()
         self._apply_theme_styles()
         self._news_panel.refresh_theme()
+        self._tray.set_accent(self._theme.theme.accent)
         self.update()
 
     def _apply_theme_styles(self) -> None:
@@ -629,9 +729,7 @@ class JarvisUI(QWidget):
         )
 
     def _start_typewriter(self) -> None:
-        full_text = self._config.get(
-            "greeting", "Selecciona tu modo de operacion:"
-        )
+        full_text = self._build_greeting()
         self._greeting_pos = 0
         self._type_timer = QTimer(self)
         self._type_timer.timeout.connect(self._type_char)
@@ -639,6 +737,17 @@ class JarvisUI(QWidget):
         self._full_greeting = full_text
         self._type_char()
         self._update_status_ready()
+
+    def _build_greeting(self) -> str:
+        """Saludo dinamico: franja horaria + nombre real o adjetivo rotativo."""
+        # Nombre real si la cuenta GitHub esta vinculada
+        display_name = self._settings.github_name or ""
+        if not display_name:
+            # Adjetivo rotativo: el indice avanza en cada arranque
+            idx = self._settings.greeting_adjective_index
+            display_name = ADJECTIVES[idx % len(ADJECTIVES)]
+            self._settings.greeting_adjective_index = (idx + 1) % len(ADJECTIVES)
+        return greeting_for(datetime.now(), display_name)
 
     def _type_char(self) -> None:
         self._greeting_pos += 2
@@ -694,6 +803,11 @@ class JarvisUI(QWidget):
 
         if self._on_mode_selected:
             self._on_mode_selected(mode_id)
+
+        # Opcion C del diseno: al elegir un modo el launcher se oculta y
+        # deja al frente las aplicaciones lanzadas. Se vuelve con el atajo
+        # global (Ctrl+Shift+Espacio) o desde la bandeja.
+        QTimer.singleShot(700, self.hide)
 
     def set_launch_complete(
         self,

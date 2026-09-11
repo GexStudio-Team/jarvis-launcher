@@ -17,6 +17,7 @@ from PyQt6.QtWidgets import QApplication
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from core.config import ConfigManager
+from core.github_link import detect_gh_identity
 from core.launcher import AppLauncher
 from core.settings import SettingsManager
 from ui.jarvis_ui import JarvisUI
@@ -156,7 +157,23 @@ def main() -> int:
     ui = JarvisUI(config._config, settings=settings)
     ui._on_mode_selected = _handle_mode_selected(launcher, ui, config)
 
-    ui.show()
+    # Deteccion automatica de la cuenta de GitHub (si aun no esta vinculada).
+    # Corre en un hilo para no bloquear el arranque; el saludo se actualiza
+    # en el hilo principal cuando se detecta la identidad.
+    if not settings.github_username:
+        def _detect_github():
+            ident = detect_gh_identity()
+            if ident:
+                login, name = ident
+                settings.github_username = login
+                settings.github_name = name or login
+                logger.info("Cuenta GitHub detectada automaticamente: %s", login)
+                ui.refresh_greeting()
+
+        threading.Thread(target=_detect_github, daemon=True).start()
+
+    # Z-order: garantiza que la ventana quede al frente y con foco
+    ui.show_and_raise()
 
     logger.info("J.A.R.V.I.S. Launcher iniciado.")
     exit_code = app.exec()
