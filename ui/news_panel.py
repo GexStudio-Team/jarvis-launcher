@@ -1,24 +1,25 @@
 """
 ui/news_panel.py - Panel lateral de noticias del Jarvis Launcher.
 
-Caracteristicas:
-  - Panel lateral (izquierda/derecha) redimensionable arrastrando su borde.
-  - Si no hay fuentes configuradas: estado vacio con boton "Conectar".
-  - Las noticias entran desde arriba animadas (crecen en altura + fade) y
-    el resto se desplaza hacia abajo de forma natural (insercion top-down
-    dentro de un QVBoxLayout).
-  - Click en una noticia la abre en el navegador.
-  - Refresco automatico cada 10 minutos y manual (boton).
-  - Mismo estilo visual que el resto (custom paint, sin QGraphicsEffect,
-    segun ADR-001).
+Rediseno v2 (modo workspace):
+  - Cabecera con la pregunta "¿Qué está pasando en el mundo ahora?"
+    (como pidio el usuario) y controles de refresco/configuracion.
+  - Items con jerarquia tipografica limpia: fuente + hora arriba (dim),
+    titulo destacado, preview de 2 lineas reservado bajo el titulo.
+  - Estado vacio sin emojis grandes: mensaje sobrio + boton CONECTAR.
+  - Panel lateral redimensionable arrastrando su borde; refresco automatico
+    cada 10 minutos y manual (boton); click en noticia -> navegador.
 
 Estructura
 ----------
 NewsPanel (QFrame):
-  - Header: titulo NOTICIAS + boton refresco + boton config.
-  - NewsList (QScrollArea) con NewsItemWidget apilados.
-  - EmptyNewsView: estado "sin conexion" con boton CONECTAR.
-  - Footer: estado/fuentes/ultima hora.
+  - Header: titulo + separador + boton refresco + boton config
+  - NewsList (QScrollArea) con NewsItemWidget apilados
+  - EmptyNewsView: estado "sin conexion" con boton CONECTAR
+  - Footer: estado/fuentes/ultima hora
+
+Mismo estilo visual que el resto (custom paint, sin QGraphicsEffect,
+segun ADR-001).
 """
 
 from __future__ import annotations
@@ -32,7 +33,6 @@ from PyQt6.QtCore import (
     QTimer,
     QPropertyAnimation,
     QEasingCurve,
-    QRectF,
     pyqtProperty,
     pyqtSignal,
 )
@@ -58,11 +58,11 @@ from core.themes import ThemeManager
 
 
 class NewsItemWidget(QFrame):
-    """Una noticia individual con entrada slide+fade desde arriba."""
+    """Una noticia individual con jerarquia limpia (fuente/titulo/preview)."""
 
     itemClicked = pyqtSignal(object)  # NewsItem
 
-    BASE_HEIGHT = 88
+    BASE_HEIGHT = 108
 
     def __init__(
         self,
@@ -87,19 +87,14 @@ class NewsItemWidget(QFrame):
     def _build_layout(self) -> None:
         lay = QVBoxLayout(self)
         lay.setContentsMargins(12, 8, 12, 8)
-        lay.setSpacing(3)
+        lay.setSpacing(2)
 
-        self._title_label = QLabel(self.item.title, self)
-        self._title_label.setWordWrap(True)
-        self._title_label.setStyleSheet("background: transparent; border: none;")
-        f = QFont("Segoe UI", 10)
-        self._title_label.setFont(f)
-        lay.addWidget(self._title_label, 1)
-
+        # Meta: fuente + hora (dim, compacto, uppercase)
         meta = QHBoxLayout()
         meta.setSpacing(8)
         self._source_label = QLabel(self.item.source.upper(), self)
-        fs = QFont("Segoe UI", 7, QFont.Weight.Bold)
+        fs = QFont("Segoe UI", 7, QFont.Weight.DemiBold)
+        fs.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, 1)
         self._source_label.setFont(fs)
         self._source_label.setStyleSheet("background: transparent; border: none;")
         meta.addWidget(self._source_label)
@@ -110,6 +105,28 @@ class NewsItemWidget(QFrame):
         meta.addWidget(self._time_label)
         meta.addStretch()
         lay.addLayout(meta)
+
+        # Titulo (destacado, 2 lineas max)
+        self._title_label = QLabel(self.item.title, self)
+        self._title_label.setWordWrap(True)
+        self._title_label.setStyleSheet("background: transparent; border: none;")
+        self._title_label.setMaximumHeight(34)
+        f = QFont("Segoe UI", 9, QFont.Weight.Bold)
+        self._title_label.setFont(f)
+        lay.addWidget(self._title_label)
+
+        # Preview (resumen del feed, 2 lineas, dim)
+        summary = (self.item.extra.get("summary") or "").strip()
+        if summary:
+            self._preview_label = QLabel(summary, self)
+            self._preview_label.setWordWrap(True)
+            self._preview_label.setMaximumHeight(28)
+            self._preview_label.setStyleSheet(
+                "background: transparent; border: none; font-size: 10px;"
+            )
+            fp = QFont("Segoe UI", 8)
+            self._preview_label.setFont(fp)
+            lay.addWidget(self._preview_label)
 
     # ------------------------------------------------------------------
     # Hover
@@ -214,7 +231,7 @@ class NewsItemWidget(QFrame):
         # Fondo de la tarjeta (translucido del tema)
         path = self._rounded_rect_path(w, h, 10)
         base = QColor(them.card_bg)
-        base.setAlpha(int(230 * alpha_scale))
+        base.setAlpha(int(235 * alpha_scale))
         p.setPen(Qt.PenStyle.NoPen)
         p.setBrush(base)
         p.drawPath(path)
@@ -222,7 +239,7 @@ class NewsItemWidget(QFrame):
         # Acento izquierdo (color de la fuente)
         if alpha_scale > 0.02:
             accent = QColor(them.accent)
-            accent.setAlpha(int(160 * alpha_scale))
+            accent.setAlpha(int(150 * alpha_scale))
             p.setPen(Qt.PenStyle.NoPen)
             p.setBrush(accent)
             p.drawRoundedRect(4, 10, 3, max(0, h - 20), 2, 2)
@@ -244,7 +261,7 @@ class NewsItemWidget(QFrame):
             f"background: transparent; border: none; color: {title_color};"
         )
 
-        # Fuente / hora
+        # Fuente / hora / preview
         dim = them.text_dim
         self._source_label.setStyleSheet(
             f"background: transparent; border: none; color: {dim};"
@@ -252,6 +269,10 @@ class NewsItemWidget(QFrame):
         self._time_label.setStyleSheet(
             f"background: transparent; border: none; color: {dim};"
         )
+        if hasattr(self, "_preview_label"):
+            self._preview_label.setStyleSheet(
+                f"background: transparent; border: none; color: {them.text_dim};"
+            )
         super().paintEvent(event)
         p.end()
 
@@ -272,7 +293,7 @@ class NewsItemWidget(QFrame):
 
 
 class EmptyNewsView(QWidget):
-    """Mensaje + boton Conectar cuando no hay fuentes de noticias."""
+    """Mensaje sobrio + boton Conectar cuando no hay fuentes de noticias."""
 
     connectClicked = pyqtSignal()
 
@@ -292,9 +313,9 @@ class EmptyNewsView(QWidget):
         lay.setSpacing(12)
         lay.addStretch()
 
-        self._icon = QLabel("📰", self)
+        self._icon = QLabel("◉", self)
         self._icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._icon.setStyleSheet("background: transparent; border: none; font-size: 42px;")
+        self._icon.setStyleSheet("background: transparent; border: none; font-size: 18px;")
         lay.addWidget(self._icon, alignment=Qt.AlignmentFlag.AlignCenter)
 
         self._msg = QLabel(
@@ -318,6 +339,10 @@ class EmptyNewsView(QWidget):
         them = self._theme.theme
         if not hasattr(self, "_msg"):
             return
+        self._icon.setStyleSheet(
+            f"background: transparent; border: none; color: {them.accent};"
+            f"font-size: 18px;"
+        )
         self._msg.setStyleSheet(
             f"background: transparent; border: none; color: {them.text_dim}; font-size: 12px;"
         )
@@ -399,32 +424,35 @@ class NewsPanel(QFrame):
         outer.setContentsMargins(12, 12, 6, 12)
         outer.setSpacing(10)
 
-        # Header
-        header = QHBoxLayout()
-        header.setSpacing(6)
-        self._title = QLabel("NOTICIAS", self)
-        title_font = QFont("Segoe UI", 10, QFont.Weight.Bold)
-        title_font.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, 3)
-        self._title.setFont(title_font)
-        header.addWidget(self._title)
-        header.addStretch()
+        # Header: pregunta del usuario + controles
+        header = QVBoxLayout()
+        header.setSpacing(4)
 
-        # Decoracion header: separador
-        header.addWidget(self._mk_header_sep())
+        row1 = QHBoxLayout()
+        row1.setSpacing(6)
+        self._title = QLabel("¿QUÉ ESTÁ PASANDO EN EL MUNDO AHORA?", self)
+        title_font = QFont("Segoe UI", 8, QFont.Weight.Bold)
+        title_font.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, 1)
+        self._title.setFont(title_font)
+        self._title.setWordWrap(True)
+        row1.addWidget(self._title, 1)
 
         self._refresh_btn = QPushButton("⟳", self)
         self._refresh_btn.setFixedSize(26, 26)
         self._refresh_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._refresh_btn.setToolTip("Actualizar noticias")
         self._refresh_btn.clicked.connect(self.refresh)
-        header.addWidget(self._refresh_btn)
+        row1.addWidget(self._refresh_btn)
 
-        self._config_btn = QPushButton("⚙", self)
-        self._config_btn.setFixedSize(26, 26)
+        self._config_btn = QPushButton("CONFIG", self)
+        self._config_btn.setFixedHeight(26)
         self._config_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._config_btn.setToolTip("Configurar fuentes de noticias")
         self._config_btn.clicked.connect(self.configureRequested.emit)
-        header.addWidget(self._config_btn)
+        row1.addWidget(self._config_btn)
+
+        header.addLayout(row1)
+        header.addWidget(self._mk_header_sep())
 
         outer.addLayout(header)
 
@@ -464,7 +492,9 @@ class NewsPanel(QFrame):
 
     def _mk_header_sep(self) -> QFrame:
         sep = QFrame(self)
-        sep.setFixedWidth(8)
+        sep.setFixedHeight(1)
+        them = self._theme.theme
+        sep.setStyleSheet(f"background: {them.card_border}; border: none;")
         return sep
 
     # ------------------------------------------------------------------
@@ -510,25 +540,43 @@ class NewsPanel(QFrame):
         )
         self._title.setStyleSheet(
             f"background: transparent; border: none; color: {them.accent};"
+            f"font-size: 8px; font-weight: bold; letter-spacing: 1px;"
         )
         accent = them.accent
-        for btn in (self._refresh_btn, self._config_btn):
-            btn.setStyleSheet(
-                f"""
-                QPushButton {{
-                    background: transparent;
-                    color: {them.text_dim};
-                    border: 1px solid {them.card_border};
-                    border-radius: 6px;
-                    font-size: 14px;
-                    font-weight: bold;
-                }}
-                QPushButton:hover {{
-                    color: {accent};
-                    border-color: {accent};
-                }}
-                """
-            )
+        self._refresh_btn.setStyleSheet(
+            f"""
+            QPushButton {{
+                background: transparent;
+                color: {them.text_dim};
+                border: 1px solid {them.card_border};
+                border-radius: 6px;
+                font-size: 14px;
+                font-weight: bold;
+            }}
+            QPushButton:hover {{
+                color: {accent};
+                border-color: {accent};
+            }}
+            """
+        )
+        self._config_btn.setStyleSheet(
+            f"""
+            QPushButton {{
+                background: transparent;
+                color: {them.text_dim};
+                border: 1px solid {them.card_border};
+                border-radius: 6px;
+                padding: 0 8px;
+                font-size: 8px;
+                font-weight: bold;
+                letter-spacing: 1px;
+            }}
+            QPushButton:hover {{
+                color: {accent};
+                border-color: {accent};
+            }}
+            """
+        )
         self._empty_view.set_theme(self._theme)
 
     def refresh_theme(self) -> None:

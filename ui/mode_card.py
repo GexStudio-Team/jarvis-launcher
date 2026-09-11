@@ -1,14 +1,14 @@
 """
-ui/mode_card.py - Tarjeta animada de modo (Gaming / Trabajo / Estudio).
+ui/mode_card.py - Tarjeta de modo (Gaming / Trabajo / Estudio) estilo workspace.
 
-Rediseno v1.4 (tema 2 del usuario):
-  - Pintura 100% custom en paintEvent (sin QLabels ni QGraphicsEffect,
-    segun ADR-001).
-  - Icono flotante (animacion sinusoidal continua).
-  - Zoom + halo al hover.
-  - Barrido de energia superior al seleccionar (sweep beam).
-  - Entrada escalonada (entrance: fade + slide up).
-  - Borde con gradiente por modo en reposo y acento pleno al hover.
+Rediseno v2 (modo workspace / focus mode):
+  - Estetica profesional sobria: monograma tipografico en lugar del icono
+    emoji flotante, barra de acento superior estilo IDE y paleta de tema
+    (sin exceso de neones ni brackets HUD).
+  - Jerarquia clara: titulo del modo, descripcion breve y contador de
+    aplicaciones en tipografia de terminal.
+  - Los MODOS se conservan (Gaming/Trabajo/Estudio) tal como pidio el
+    usuario; solo cambia la presentacion visual a un tono pro/workspace.
 
 Propiedades animables (QPropertyAnimation):
   - glowOpacity (halo hover)
@@ -16,7 +16,7 @@ Propiedades animables (QPropertyAnimation):
   - entrance    (fade+slide de aparicion)
   - sweep       (progreso 0..1 del barrido al seleccionar)
   - zoom        (escala visual al hover, pintura escalada)
-  - iconFloat   (offset vertical del icono, loop con QTimer)
+  - iconFloat   (offset vertical del monograma, loop con QTimer)
 """
 
 from __future__ import annotations
@@ -178,7 +178,7 @@ class ModeCard(QWidget):
         self._is_hovered = True
         self._animate_glow(1.0)
         self._animate_height(self._base_height + self.HOVER_HEIGHT_BOOST)
-        self._animate_zoom(1.045)
+        self._animate_zoom(1.02)
         super().enterEvent(event)
 
     def leaveEvent(self, event) -> None:
@@ -293,7 +293,7 @@ class ModeCard(QWidget):
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
         w, h = self.width(), self.height()
         them = self._theme.theme
-        radius = 18.0
+        radius = 16.0
 
         # Entrance: fade + slide up
         e = max(0.0, min(1.0, self._entrance))
@@ -315,14 +315,14 @@ class ModeCard(QWidget):
             p.scale(self._zoom, self._zoom)
             p.translate(-cx, -cy)
 
-        # ---- Halo exterior (hover) ----
+        # ---- Halo exterior sutil (hover) ----
         if glow > 0.01:
             p.save()
             halo_path = self._rounded_rect_path(w + 30, h_eff + 30, radius + 9)
             halo_path.translate(-15, -15)
             halo_grad = QRadialGradient(w / 2, h_eff / 2, w * 0.6)
             glow_color = QColor(self._color)
-            glow_color.setAlpha(int(50 * glow))
+            glow_color.setAlpha(int(28 * glow))
             halo_grad.setColorAt(0.0, glow_color)
             halo_grad.setColorAt(1.0, QColor(0, 0, 0, 0))
             p.setPen(Qt.PenStyle.NoPen)
@@ -333,45 +333,33 @@ class ModeCard(QWidget):
         # ---- Path principal ----
         path = self._rounded_rect_path(w, h_eff, radius)
 
-        # ---- Fondo glassmorphism segun tema ----
+        # ---- Fondo workspace (sobrio, segun tema) ----
         p.save()
         p.setClipPath(path)
         bg = QColor(them.card_bg)
-        bg.setAlpha(int(215 * alpha_scale))
+        bg.setAlpha(int(225 * alpha_scale))
         p.fillRect(0, 0, w, h_eff, bg)
         p.restore()
 
-        # ---- Borde gradiente (modo) ----
+        # ---- Borde neutro + acento del modo al hover ----
         p.save()
-        border_pen = QPen()
-        border_pen.setWidth(2)
-        border_grad = QLinearGradient(0, 0, w, h_eff)
-        alpha = int((90 + 165 * glow) * alpha_scale)
-        border_grad.setColorAt(
-            0.0, QColor(self._color.red(), self._color.green(), self._color.blue(), alpha)
-        )
-        border_grad.setColorAt(
-            1.0,
-            QColor(
-                self._color.red(),
-                self._color.green(),
-                self._color.blue(),
-                int(alpha * 0.35),
-            ),
-        )
-        border_pen.setBrush(border_grad)
+        border_alpha = int((70 + 90 * glow) * alpha_scale)
+        border_col = QColor(self._color)
+        border_col.setAlpha(border_alpha)
+        border_pen = QPen(border_col)
+        border_pen.setWidth(1)
         p.setPen(border_pen)
         p.setBrush(Qt.BrushStyle.NoBrush)
         p.drawPath(path)
         p.restore()
 
-        # ---- Glow radial interior (hover) ----
+        # ---- Glow radial interior (hover, muy sutil) ----
         if glow > 0.01:
             p.save()
             p.setClipPath(path)
             inner_grad = QRadialGradient(w / 2, h_eff / 3, h_eff * 0.85)
             inner_color = QColor(self._color)
-            inner_color.setAlpha(int(58 * glow))
+            inner_color.setAlpha(int(34 * glow))
             inner_grad.setColorAt(0.0, inner_color)
             inner_grad.setColorAt(1.0, QColor(0, 0, 0, 0))
             p.fillRect(0, 0, w, h_eff, inner_grad)
@@ -381,13 +369,13 @@ class ModeCard(QWidget):
         if self._sweep > 0.0 and self._sweep < 1.0:
             self._draw_sweep(p, w, h_eff, radius)
 
-        # ---- Icono flotante + texto ----
+        # ---- Barra de acento superior tipo IDE ----
+        self._draw_accent_bar(p, w, e, glow)
+
+        # ---- Monograma + texto (workspace) ----
         self._draw_content(p, w, h_eff, e)
 
-        # ---- Corner brackets HUD ----
-        self._draw_corner_brackets(p, w, h_eff, radius)
-
-        # ---- Linea decorativa inferior ----
+        # ---- Linea decorativa inferior sutil ----
         p.save()
         p.setClipPath(path)
         line_pen = QPen(
@@ -395,12 +383,12 @@ class ModeCard(QWidget):
                 self._color.red(),
                 self._color.green(),
                 self._color.blue(),
-                int((60 + 40 * glow) * alpha_scale),
+                int((40 + 26 * glow) * alpha_scale),
             )
         )
         line_pen.setWidth(1)
         p.setPen(line_pen)
-        p.drawLine(24, h_eff - 42, w - 24, h_eff - 42)
+        p.drawLine(24, h_eff - 44, w - 24, h_eff - 44)
         p.restore()
 
         p.end()
@@ -422,48 +410,72 @@ class ModeCard(QWidget):
         p.restore()
 
     def _draw_content(self, p: QPainter, w: int, h: int, e: float) -> None:
-        """Icono flotante, nombre, descripcion y contador de apps."""
+        """Monograma sobrio + nombre, descripcion y contador (modo workspace).
+
+        A diferencia de la v1.4 (icono emoji flotante), el modo workspace usa
+        un monograma disciplinado: las iniciales del modo en un contenedor
+        redondeado con el color de acento, jerarquia clara y sin ruido.
+        """
         them = self._theme.theme
 
-        # ---- Icono (flotante + glow detras) ----
-        icon_size = 52
-        icon_y_center = int(h * 0.30) + int(self._icon_float)
-        # Glow detras del icono
-        glow_r = 40
-        glow_grad = QRadialGradient(
-            float(w // 2), float(icon_y_center), float(glow_r)
+        # ---- Monograma (inicial del modo) ----
+        mono_size = 58
+        mono_y = int(h * 0.20) + int(self._icon_float)
+        mono_rect = (
+            w // 2 - mono_size // 2,
+            mono_y - mono_size // 2,
+            mono_size,
+            mono_size,
         )
-        gc = QColor(self._color)
-        gc.setAlpha(int(38 * e))
-        glow_grad.setColorAt(0.0, gc)
-        glow_grad.setColorAt(1.0, QColor(0, 0, 0, 0))
+
+        # Contenedor redondeado sobrio
+        p.save()
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        container_path = QPainterPath()
+        container_path.addRoundedRect(
+            mono_rect[0], mono_rect[1], mono_rect[2], mono_rect[3], 12, 12
+        )
+        fill = QColor(self._color)
+        fill.setAlpha(int(26 * e))
         p.setPen(Qt.PenStyle.NoPen)
-        p.setBrush(glow_grad)
-        p.drawEllipse(
-            w // 2 - glow_r, icon_y_center - glow_r, glow_r * 2, glow_r * 2
-        )
+        p.setBrush(fill)
+        p.drawPath(container_path)
+        border_col = QColor(self._color)
+        border_col.setAlpha(int(90 * e))
+        border_pen = QPen(border_col)
+        border_pen.setWidth(1)
+        p.setBrush(Qt.BrushStyle.NoBrush)
+        p.setPen(border_pen)
+        p.drawPath(container_path)
+        p.restore()
 
-        icon_font = QFont("Segoe UI Emoji", 40)
-        p.setFont(icon_font)
-        p.setPen(QColor(255, 255, 255, int(235 * e)))
-        fm = p.fontMetrics()
-        icon_w = fm.horizontalAdvance(self._icon)
+        # Inicial del modo (sin emoji)
+        initial = (self._name or "?").strip()[:1].upper()
+        mono_font = QFont("Segoe UI", 24, QFont.Weight.Bold)
+        mono_font.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, 1)
+        p.setFont(mono_font)
+        mono_col = QColor(self._color)
+        mono_col.setAlpha(int(225 * e))
+        p.setPen(mono_col)
         p.drawText(
-            (w - icon_w) // 2,
-            icon_y_center + int(fm.height() * 0.35),
-            self._icon,
+            mono_rect[0],
+            mono_rect[1],
+            mono_rect[2],
+            mono_rect[3],
+            Qt.AlignmentFlag.AlignCenter,
+            initial,
         )
 
-        # ---- Nombre ----
+        # ---- Nombre del modo ----
         name_font = QFont("Segoe UI", 16, QFont.Weight.Bold)
-        name_font.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, 2)
+        name_font.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, 1)
         p.setFont(name_font)
-        name_color = QColor(self._color)
+        name_color = QColor(them.text)
         name_color.setAlpha(int(235 * e))
         p.setPen(name_color)
         p.drawText(
             0,
-            int(h * 0.52),
+            int(h * 0.46),
             w,
             int(h * 0.12),
             Qt.AlignmentFlag.AlignHCenter,
@@ -475,24 +487,24 @@ class ModeCard(QWidget):
             desc_font = QFont("Segoe UI", 10)
             p.setFont(desc_font)
             desc_color = QColor(them.text_dim)
-            desc_color.setAlpha(int(190 * e))
+            desc_color.setAlpha(int(200 * e))
             p.setPen(desc_color)
             p.drawText(
                 16,
-                int(h * 0.64),
+                int(h * 0.58),
                 w - 32,
                 int(h * 0.18),
                 Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop,
                 self._description,
             )
 
-        # ---- Contador de apps ----
-        word = "app" if self._app_count == 1 else "apps"
-        count_text = f"{self._app_count} {word} para lanzar"
-        count_font = QFont("Segoe UI", 9)
+        # ---- Contador de apps (tipo status bar) ----
+        word = "aplicacion" if self._app_count == 1 else "aplicaciones"
+        count_text = f"{self._app_count} {word}"
+        count_font = QFont("Consolas", 9)
         p.setFont(count_font)
         count_color = QColor(them.text_dim)
-        count_color.setAlpha(int(150 * e))
+        count_color.setAlpha(int(160 * e))
         p.setPen(count_color)
         p.drawText(
             0,
@@ -503,22 +515,16 @@ class ModeCard(QWidget):
             count_text,
         )
 
-    def _draw_corner_brackets(
-        self, p: QPainter, w: int, h: int, radius: float
-    ) -> None:
-        """Esquinas tipo HUD que aparecen plenas al hover."""
-        length = 24
-        margin = 10
-        alpha = int((35 + 220 * self._glow_opacity) * min(1.0, self._entrance))
-        pen = QPen(QColor(self._color.red(), self._color.green(), self._color.blue(), alpha))
-        pen.setWidth(2)
-        p.setPen(pen)
-
-        def bracket(cx: int, cy: int, dx: int, dy: int) -> None:
-            p.drawLine(cx, cy, cx + dx * length, cy)
-            p.drawLine(cx, cy, cx, cy + dy * length)
-
-        bracket(margin, margin, 1, 1)
-        bracket(w - margin, margin, -1, 1)
-        bracket(margin, h - margin, 1, -1)
-        bracket(w - margin, h - margin, -1, -1)
+    def _draw_accent_bar(self, p: QPainter, w: int, e: float, glow: float) -> None:
+        """Barra de acento superior estilo IDE (sobria, plena al hover)."""
+        bar_h = 3
+        bar_w = int(w * (0.42 + 0.5 * glow))
+        x0 = (w - bar_w) // 2
+        p.save()
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        accent = QColor(self._color)
+        accent.setAlpha(int(170 * e))
+        p.setPen(Qt.PenStyle.NoPen)
+        p.setBrush(accent)
+        p.drawRoundedRect(x0, 0, bar_w, bar_h, 2, 2)
+        p.restore()
