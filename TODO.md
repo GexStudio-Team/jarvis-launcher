@@ -41,10 +41,24 @@
 - [x] v1.4.0: render test offscreen completo (boot, hover, click, panel, 8 temas) 0 errores QPainter
 - [x] v1.4.0: prueba en vivo de noticias (18 items reales de 4 fuentes)
 - [x] v1.4.0: docs ADR-004 (temas) y ADR-005 (panel noticias); Arquitectura/README/CHANGELOG actualizados
+- [x] v1.4.0: release GitHub v1.4.0 publicada (tag v1.4.0, main == origin/main == a6e57a8)
+- [x] v2: `core/hotkey.py` — atajo global Ctrl+Shift+Espacio (RegisterHotKey ctypes + QAbstractNativeEventFilter, cero deps)
+- [x] v2: `core/tray.py` — bandeja del sistema (icono generado por codigo, menu Mostrar/Salir, doble click)
+- [x] v2: `core/greeting.py` — saludo dinamico por franja horaria + adjetivo rotativo por arranque
+- [x] v2: `core/github_link.py` — vinculacion real de GitHub (deteccion `gh` autenticado + verificacion API publica, sin secretos)
+- [x] v2: `core/settings.py` — claves tray/github/greeting con migracion suave
+- [x] v2: `ui/mode_card.py` — cards modo workspace: monograma tipografico en vez de emoji, barra IDE, paleta sobria (modos conservados)
+- [x] v2: `ui/news_panel.py` — cabecera "¿Que esta pasando en el mundo ahora?", items con jerarquia limpia (fuente/hora/titulo/preview), estado vacio sin emoji
+- [x] v2: `ui/settings_dialog.py` — lista estructurada (1 Apariencia, 2 Comportamiento, 3 Noticias, 4 GitHub, 5 Proximamente) + GithubDialog
+- [x] v2: `ui/jarvis_ui.py` — z-order siempra al frente, ocultar al elegir modo, ✕ oculta a bandeja, saludo dinamico, refresh_greeting/toggle_startup publicos
+- [x] v2: `main.py` — show_and_raise al arrancar + deteccion automatica de GitHub en hilo
+- [x] v2: pruebas offscreen (render UI, tarjetas, noticias, dialogo ajustes, boot completo) 0 errores
+- [x] v2: push main -> origin/main (cce3112)
+- [x] v2: docs actualizadas — CHANGELOG [2.0.0], README (caracteristicas/atajos/estructura), Arquitectura.md (modulos v2, flujo), ADR-006 (atajo global + bandeja), config.json -> 2.0.0
 
 ## En progreso
 
-- [ ] Crear release GitHub v1.4.0 (propuesta pendiente de aprobacion)
+- [ ] Rama `feat/news-reader`: lector de noticias del punto 3 y 4 del diseno v2 (vista redimensionable, lead/pull-quote/lectura larga)
 
 ## Pendiente
 

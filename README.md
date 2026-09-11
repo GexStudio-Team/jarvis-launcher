@@ -27,6 +27,20 @@ Interfaz tipo JARVIS (Iron Man) que se ejecuta al iniciar Windows y permite lanz
   propia URL RSS/Atom (se valida antes de conectar)
 - **Temas de color**: 8 paletas (obsidiana, nocturno, crimson, esmeralda,
   matriz, violeta, ambar, luz, nieve) selectables desde la rueda de ajustes ⚙
+- **Siempre al frente + bandeja del sistema**: el launcher queda encima de todo;
+  al pulsar ✕ se oculta a la bandeja y sigue activo (doble clic en el icono
+  para volverlo a abrir)
+- **Atajo global `Ctrl+Shift+Espacio`**: convoca u oculta el launcher desde
+  cualquier aplicación
+- **Saludo dinámico**: "Buenos días/tardes/noches" según la hora, con adjetivo
+  profesional rotativo (Desarrollador, Ingeniero, Arquitecto, ...) o con tu
+  **nombre real** si vinculas tu cuenta de GitHub
+- **Vinculación de cuenta GitHub**: el launcher detecta tu cuenta automática­mente
+  (si tienes el CLI `gh` autenticado) o puedes vincularla manualmente desde
+  los ajustes para que el saludo use tu nombre real
+- **Panel de control estructurado**: lista por secciones (Apariencia,
+  Comportamiento, Noticias, Cuenta de GitHub, Próximamente) con auto-inicio y
+  bandeja configurables
 
 ## Requisitos
 
@@ -148,19 +162,24 @@ Para desactivar, ejecuta el mismo script nuevamente.
 
 | Tecla | Accion |
 |-------|--------|
-| `Escape` | Cerrar launcher |
+| `Ctrl + Shift + Espacio` | Convocar/ocultar el launcher (desde cualquier app) |
+| `Escape` | Ocultar el launcher |
 | `F11` | Alternar pantalla completa |
 
-## Noticias y temas (v1.4)
+## Noticias y temas
 
 ### Rueda de ajustes ⚙
 
-Haz clic en la rueda **⚙** (esquina superior derecha) para abrir el panel de control:
+Haz clic en la rueda **⚙** (esquina superior derecha) para abrir el panel de
+control, organizado en secciones:
 
-- **Tema**: elige una de las 8 paletas de color (swatches con vista previa).
-- **Panel de noticias**: activar/desactivar y elegir posición (izquierda o
-  derecha).
-- **Fuentes**: botón para abrir el conector de fuentes.
+- **1 · Apariencia**: tema de color (swatches con vista previa).
+- **2 · Comportamiento**: atajo global, bandeja del sistema y auto-inicio.
+- **3 · Panel de noticias**: activar/desactivar, posición y fuente conectada.
+- **4 · Cuenta de GitHub**: vincula tu cuenta para que el saludo use tu
+  nombre real.
+- **5 · Próximamente**: funciones en desarrollo (editor de modos, paletas,
+  lector de noticias).
 
 ### Conectar una fuente de noticias
 
@@ -196,18 +215,22 @@ jarvis-launcher/
 ├── install_jarvis_cmd.bat  # Instalar/desinstalar comando global `jarvis`
 ├── core/
 │   ├── config.py        # Gestor de configuracion de modos
-│   ├── settings.py      # Preferencias de interfaz (tema, panel de noticias)
+│   ├── settings.py      # Preferencias de interfaz (tema, noticias, bandeja, GitHub)
 │   ├── themes.py        # Paletas y gestor de temas de color
 │   ├── news.py          # Servicio de noticias RSS/Atom (stdlib)
+│   ├── hotkey.py        # Atajo global Ctrl+Shift+Espacio (RegisterHotKey)
+│   ├── tray.py          # Bandeja del sistema
+│   ├── greeting.py      # Saludo dinamico por hora + adjetivo rotativo
+│   ├── github_link.py   # Vinculacion de cuenta GitHub (gh / API publica)
 │   ├── launcher.py      # Motor de apertura de apps
 │   ├── state.py         # Historial de modos recientes
 │   ├── feedback.py      # Sonidos de feedback (winsound)
 │   └── notifier.py      # Notificaciones toast de Windows
 ├── ui/
 │   ├── jarvis_ui.py     # Ventana principal con efectos HUD
-│   ├── mode_card.py     # Tarjetas animadas de modo
+│   ├── mode_card.py     # Tarjetas workspace de modo (monograma)
 │   ├── news_panel.py    # Panel lateral de noticias
-│   └── settings_dialog.py  # Rueda de ajustes + conector de fuentes
+│   └── settings_dialog.py  # Panel de control estructurado + GitHub/Connect
 └── assets/
     ├── startup.vbs      # Script de auto-inicio Windows
     └── jarvis.cmd       # Origen del comando global `jarvis`

@@ -6,6 +6,62 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/).
 
 ---
 
+## [2.0.0] - 2026-09-11 (America/Bogota)
+
+### Added
+- `core/hotkey.py` (`GlobalHotkey`): atajo global `Ctrl+Shift+Espacio` para
+  convocar/ocultar el launcher desde cualquier aplicación, implementado con
+  `RegisterHotKey` (API nativa de Windows vía ctypes) y
+  `QAbstractNativeEventFilter`; degradación silenciosa si el atajo está en uso
+- `core/tray.py` (`Tray`): bandeja del sistema con icono generado por código
+  (`QPainter`, sin assets externos), menú contextual Mostrar/Salir y doble
+  clic para invocar el launcher
+- `core/greeting.py`: saludo dinámico según franja horaria (Buenos días /
+  Buenas tardes / Buenas noches) + adjetivo profesional rotativo por arranque
+  (Desarrollador, Ingeniero, Arquitecto, Creador, Hacker, Explorador, Maestro,
+  Visionario, Estratega, Artesano)
+- `core/github_link.py`: vinculación real de la cuenta de GitHub para que el
+  launcher salude por el nombre real — detección automática con `gh` autenticado
+  (`gh api user`) y verificación manual contra la API pública
+  `GET https://api.github.com/users/{username}`; sin tokens ni secretos
+- `core/settings.py`: nuevas claves de ajuste con migración suave —
+  `tray.enabled`, `github.{username,name}` y `greeting.adjective_index`
+- `ui/settings_dialog.py` (`GithubDialog`): modal de vinculación de cuenta
+  GitHub con detección automática en hilo y verificación manual por username
+- Opción 5 “Próximamente” en el panel de control: editor visual de modos,
+  editor de paletas y lector de noticias a pantalla completa (estado borrador)
+
+### Changed
+- **Comportamiento de ventana (decisión C del diseño v2)**: el launcher queda
+  SIEMPRE al frente (`show_and_raise` + `activateWindow`), se oculta
+  automáticamente al elegir un modo (deja al frente las aplicaciones lanzadas)
+  y se reinvoca con el atajo global o la bandeja; el botón ✕ ahora oculta a la
+  bandeja en lugar de cerrar la aplicación
+- `ui/mode_card.py`: rediseño "modo workspace" — el icono emoji flotante se
+  sustituye por un monograma tipográfico (inicial del modo) en contenedor
+  sobrio, barra de acento superior estilo IDE, paleta del tema, jerarquía clara
+  (nombre / descripción / contador de aplicaciones en Consolas); se CONSERVAN
+  los modos Gaming/Trabajo/Estudio tal como pidió el usuario
+- `ui/news_panel.py`: cabecera nueva "¿QUÉ ESTÁ PASANDO EN EL MUNDO AHORA?",
+  items con jerarquía tipográfica limpia (fuente + hora en dim, título
+  destacado de 2 líneas, preview del resumen del feed), estado vacío sobrio sin
+  emoji grande y botón CONFIG de fuentes
+- `ui/settings_dialog.py`: el panel de control pasa a ser una LISTA
+  ESTRUCTURADA con filas etiqueta-izquierda/control-derecha y separadores
+  (1 · Apariencia, 2 · Comportamiento, 3 · Noticias, 4 · Cuenta de GitHub,
+  5 · Próximamente); añadidos controles de bandeja y auto-inicio funcionales
+- `ui/jarvis_ui.py`: integración de bandeja + atajo global + saludo dinámico;
+  `refresh_greeting()` y `toggle_startup()` públicos para el diálogo de ajustes;
+  el icono de bandeja se recolorea al cambiar de tema
+- `main.py`: usa `show_and_raise()` al arrancar y detecta automáticamente la
+  cuenta GitHub en un hilo si aún no está vinculada
+
+### Fixed
+- El launcher podía quedar detrás de otras ventanas al arrancar: ahora fuerza
+  z-order y foco con `raise_()` + `activateWindow()`
+
+---
+
 ## [1.4.0] - 2026-09-10 (America/Bogota)
 
 ### Added
