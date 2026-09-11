@@ -26,6 +26,16 @@ class SettingsManager:
             "sources": [],               # list[{"name": str, "url": str}]
             "custom_url": "",            # URL escrita por el usuario
         },
+        "tray": {
+            "enabled": True,             # minimizar a bandeja en vez de cerrar
+        },
+        "github": {
+            "username": "",              # cuenta vinculada ("" = no vinculada)
+            "name": "",                  # nombre real obtenido de la API
+        },
+        "greeting": {
+            "adjective_index": 0,        # indice del adjetivo rotativo
+        },
     }
 
     def __init__(self, settings_path: str | None = None) -> None:
@@ -56,11 +66,16 @@ class SettingsManager:
             if key not in self._settings:
                 self._settings[key] = json.loads(json.dumps(value))
                 changed = True
-        news = self._settings["news"]
-        for key, value in self.DEFAULT_SETTINGS["news"].items():
-            if key not in news:
-                news[key] = json.loads(json.dumps(value))
-                changed = True
+        for group_key, group_value in (
+            ("news", self._settings["news"]),
+            ("tray", self._settings["tray"]),
+            ("github", self._settings["github"]),
+            ("greeting", self._settings["greeting"]),
+        ):
+            for key, value in self.DEFAULT_SETTINGS[group_key].items():
+                if key not in group_value:
+                    group_value[key] = json.loads(json.dumps(value))
+                    changed = True
         if changed:
             self.save()
 
@@ -156,4 +171,52 @@ class SettingsManager:
             news["sources"] = list(sources)
         if custom_url is not None:
             news["custom_url"] = custom_url.strip()
+        self.save()
+
+    # ------------------------------------------------------------------
+    # Bandeja del sistema
+    # ------------------------------------------------------------------
+
+    @property
+    def tray_enabled(self) -> bool:
+        return bool(self._settings.get("tray", {}).get("enabled", True))
+
+    @tray_enabled.setter
+    def tray_enabled(self, value: bool) -> None:
+        self._settings.setdefault("tray", {})["enabled"] = bool(value)
+        self.save()
+
+    # ------------------------------------------------------------------
+    # Cuenta de GitHub vinculada (para el saludo con nombre real)
+    # ------------------------------------------------------------------
+
+    @property
+    def github_username(self) -> str:
+        return self._settings.get("github", {}).get("username", "").strip()
+
+    @github_username.setter
+    def github_username(self, value: str) -> None:
+        self._settings.setdefault("github", {})["username"] = value.strip()
+        self.save()
+
+    @property
+    def github_name(self) -> str:
+        return self._settings.get("github", {}).get("name", "").strip()
+
+    @github_name.setter
+    def github_name(self, value: str) -> None:
+        self._settings.setdefault("github", {})["name"] = value.strip()
+        self.save()
+
+    # ------------------------------------------------------------------
+    # Saludo (adjetivo rotativo por arranque)
+    # ------------------------------------------------------------------
+
+    @property
+    def greeting_adjective_index(self) -> int:
+        return int(self._settings.get("greeting", {}).get("adjective_index", 0))
+
+    @greeting_adjective_index.setter
+    def greeting_adjective_index(self, value: int) -> None:
+        self._settings.setdefault("greeting", {})["adjective_index"] = int(value)
         self.save()
