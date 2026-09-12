@@ -11,7 +11,7 @@ Interfaz tipo JARVIS (Iron Man) que se ejecuta al iniciar Windows y permite lanz
 - Animaciones suaves en las tarjetas (hover glow, elevacion, pulse al click)
 - Corner brackets estilo HUD y beam de energia hacia la tarjeta seleccionada
 - Flash de color del modo al seleccionar
-- Sonidos de feedback (click, exito, error) via `winsound.Beep`
+- Feedback 100% visual (sin sonidos de sistema): hover, resaltado, sweep y barra de estado
 - Notificaciones toast de Windows al completar el lanzamiento
 - Historial de modos recientes en la barra de estado
 - Auto-inicio en Windows (activable/desactivable desde la interfaz)
@@ -235,7 +235,6 @@ jarvis-launcher/
 │   ├── github_link.py   # Vinculacion de cuenta GitHub (gh / API publica)
 │   ├── launcher.py      # Motor de apertura de apps
 │   ├── state.py         # Historial de modos recientes
-│   ├── feedback.py      # Sonidos de feedback (winsound)
 │   └── notifier.py      # Notificaciones toast de Windows
 ├── ui/
 │   ├── jarvis_ui.py     # Ventana principal con efectos HUD

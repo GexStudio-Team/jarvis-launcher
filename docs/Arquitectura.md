@@ -7,7 +7,8 @@
 **J.A.R.V.I.S. Launcher** es una aplicación de escritorio para Windows (Python 3 +
 PyQt6) que agrupa aplicaciones por modos de operación (Gaming, Trabajo, Estudio)
 con estética estilo JARVIS. Cada modo lanza las apps configuradas y ofrece
-retroalimentación audiovisual (sonidos sintetizados y animaciones propias).
+retroalimentación visual (animaciones y resaltados propios; **sin sonidos de
+sistema**, ver ADR-010).
 Incluye panel lateral de noticias RSS (presets o URL propia), temas de color
 seleccionables desde la interfaz y panel de control (rueda ⚙).
 
@@ -45,7 +46,6 @@ flowchart TD
         gl["github_link.py - vinculación GitHub<br/>(gh autenticado / API pública)"]
         st["state.py - StateManager<br/>(persiste state.json)"]
         ln["launcher.py - AppLauncher<br/>(resuelve y lanza apps)"]
-        fb["feedback.py - sonidos (winsound.Beep)"]
         nt["notifier.py - toasts nativos de Windows"]
     end
 
@@ -195,11 +195,12 @@ flowchart TD
 - Registro de actividad por consola (`[launcher]`).
 - Ver también: [ADR-002](./ADR-002-resolucion-apps-por-nombre.md).
 
-### `core/feedback.py` — sonidos
-- Sistema de `winsound.Beep` en hilos daemon (no depende del esquema de sonidos
-  de Windows; arregla los `SND_ALIAS` que fallaban).
-- Señales: click (1250 Hz, 60 ms), éxito (987 + 1319 Hz), error (220 Hz, 260 ms).
-- No bloquea el hilo de la UI.
+### Feedback (sin sonido, ADR-010)
+- **`core/feedback.py` fue eliminado** en v2.0.1: los beeps `winsound.Beep`
+  (click/éxito/error) se quitaron por decisión del usuario y de la comunidad.
+- El feedback es **100 % visual**: hover/zoom en cards, sweep de selección,
+  resaltado de items, barra de estado inferior y toasts de `core/notifier.py`.
+- Referencia: [ADR-010](./ADR-010-feedback-sin-sonido.md).
 
 ### `core/notifier.py`
 - Toast nativo de Windows vía `Windows.UI.Notifications` (PowerShell + COM).
@@ -271,12 +272,26 @@ flowchart TD
 - **Split-pane redimensionable** (`QSplitter` horizontal, handle estilizado
   del tema): lista compacta izquierda (`MiniNewsItem`, 180–380 px) + **mini
   navegador embebido** a la derecha.
-- **Mini navegador (`MiniBrowser`)** — decisión del ADR-008: `QStackedWidget`
-  con `QWebEngineView` (Chromium, PyQt6-WebEngine) **o** `QTextBrowser`
-  (fallback con el resumen del feed). `show_article(item, html)` carga la
-  **URL real del artículo** (imágenes, CSS y contenido completo) en Chromium;
-  sin la dependencia, muestra el HTML de lectura larga v2 (lead con capitular,
-  pull-quote). El módulo se importa en el constructor (try/except, lazy).
+- **Mini navegador (`MiniBrowser`)** — decisión del ADR-008 (y optimización
+  **ADR-009**): `QStackedWidget` con `QWebEngineView` (Chromium,
+  PyQt6-WebEngine) **o** `QTextBrowser` (fallback con el resumen del feed).
+  `show_article(item, html)` carga la **URL real del artículo** (imágenes,
+  CSS y contenido completo) en Chromium; sin la dependencia, muestra el HTML
+  de lectura larga v2 (lead con capitular, pull-quote). El módulo se importa
+  en el constructor (try/except, lazy).
+- **Optimizaciones de rendimiento (ADR-009)** — el primer clic "frío"
+  (arranque de Chromium) se elimina:
+  - El view **no navega en el constructor**: los procesos del motor arrancan
+    al instanciar; la carga real solo ocurre en `show_article()` / `prewarm()`.
+  - **Pre-warm en `JarvisUI`**: `QTimer.singleShot(900, _prewarm_webengine)`
+    instancia el lector oculto tras el boot.
+  - **Perfil persistente** (`defaultProfile`): caché HTTP en disco (100 MB) y
+    storage estable en `%APPDATA%\JarvisLauncher\WebEngine`.
+  - **`_TrackerBlocker`** (`QWebEngineUrlRequestInterceptor`): bloquea
+    rastreadores/publicidad (17 dominios) sin tocar imágenes/CSS del sitio.
+  - Settings: `DnsPrefetchEnabled` + `PlaybackRequiresUserGesture`.
+  - `JARVIS_DISABLE_WEBENGINE=1`: modo CI headless que obliga al fallback de
+    texto (el renderer de Chromium no navega sin GPU).
 - Encabezado: **← VOLVER**, fuente·hora (con estado "Cargando artículo…"),
   **⟳** recargar y **ABRIR ORIGINAL ↗** (`webbrowser.open`).
 - Navegación `←`/`→` y `Escape` (señal `closeRequested`); clic en la lista
@@ -285,7 +300,7 @@ flowchart TD
 - `main.py` activa `AA_ShareOpenGLContexts` antes de crear `QApplication`
   (requisito del WebEngine).
 - Ver también: [ADR-007](./ADR-007-lector-noticias.md),
-  [ADR-008](./ADR-008-webengine.md).
+  [ADR-008](./ADR-008-webengine.md), [ADR-009](./ADR-009-optimizacion-webengine.md).
 
 ### `ui/settings_dialog.py` — `SettingsDialog` / `ConnectDialog` / `GithubDialog`
 - `SettingsDialog` (modal, rueda ⚙): **lista estructurada v2** con filas
@@ -346,7 +361,6 @@ sequenceDiagram
     U->>W: hover en tarjeta
     W->>W: halo + zoom (pintado manual)
     U->>W: click / Enter
-    W->>F: play_click()
     W->>W: FlashOverlay + beam de energía
     W->>H: hide() tras 700 ms (deja al frente las apps)
     W->>L: launch_mode(modo) [hilo daemon]

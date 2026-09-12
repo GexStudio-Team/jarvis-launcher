@@ -78,9 +78,27 @@
 - [ ] Filtro de noticias por categoria/idioma
 - [ ] Verificar contraste de temas claros en todo el paint custom
 - [ ] Editor visual de paletas de temas
-- [ ] Sonido en hover de tarjetas
+- [x] ~~Sonido en hover de tarjetas~~ — **descartado**: feedback 100 % visual
+      (ADR-010); reabrir solo si la comunidad pide feedback sonoro
+      configurable explícitamente
 - [ ] Variar velocidad del typewriter
 - [ ] Probar en la maquina real: instalar Discord y Spotify para validar resolucion por nombre
 - [ ] Verificacion de toasts de Windows 10/11
 - [ ] Prueba de pantalla completa real y posicion en monitores multiples
 - [ ] Revisar uso de CPU del core/beam en pantallas grandes
+
+## Validación en máquina real (ADR-009)
+
+- [ ] **Primer clic en noticia**: abrir el lector y confirmar que carga el
+      artículo casi al instante (sin el "arranque" de Chromium del clic)
+- [ ] Segunda visita al mismo artículo: confirmar salida de caché de disco
+      (assets cargan más rápido)
+- [ ] Página con rastreadores (p. ej. un portal de noticias): red abierta del
+      sistema → comprobar líderes de red menos saturados (los dominios de
+      ads/analytics quedan bloqueados)
+- [ ] Confirmar que la UI no emite ningún sonido al hacer clic (feedback
+      visual únicamente)
+
+---
+_Historial de release: v2.0.0 (modo foco + lector), v1.4.0 (temas/noticias/settings),
+v1.3.0 (comando global jarvis), v1.2.0 (fix renderizado/sonidos/resolución de apps)._

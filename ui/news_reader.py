@@ -19,14 +19,20 @@ NewsReaderView (QWidget a pantalla completa):
 Restricciones mantenidas: sin QGraphicsEffect (ADR-001); colores del
 ThemeManager activo en toda la UI propia; PyQt6-WebEngine es la unica
 dependencia opcional agregada (el fallback la hace no critica).
+
+Rendimiento (ADR-009): el motor se pre-calienta desde JarvisUI (pre-warm a
+~900 ms del boot), usa perfil persistente con cache HTTP en disco y bloquea
+rastreadores/publicidad; el view no navega en el constructor y
+JARVIS_DISABLE_WEBENGINE=1 fuerza el fallback en CI headless.
 """
 
 from __future__ import annotations
 
 import html as _html
+import os
 import webbrowser
 
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtCore import QUrl, Qt, pyqtSignal
 from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import (
     QFrame,
@@ -41,9 +47,58 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from core.feedback import play_click
 from core.news import NewsItem
 from core.themes import ThemeManager
+
+
+# ----------------------------------------------------------------------
+# Bloqueo de rastreadores / publicidad (optimizacion de carga, ADR-009)
+# ----------------------------------------------------------------------
+
+try:
+    from PyQt6.QtWebEngineCore import (
+        QWebEngineUrlRequestInterceptor as _ReqInterceptor,
+    )
+except ImportError:  # pragma: no cover - dependencia opcional ausente
+    _ReqInterceptor = object  # type: ignore[assignment,misc]
+
+
+class _TrackerBlocker(_ReqInterceptor):
+    """Corta peticiones a rastreadores y publicidad conocidos.
+
+    Reduce bytes y JavaScript por pagina (el contenido real del sitio
+    no se toca: CSS, imagenes y fuentes de CDN conocidos se conservan).
+    """
+
+    _BLOCKED_HOSTS = (
+        "doubleclick.net",
+        "google-analytics.com",
+        "googletagmanager.com",
+        "googleadservices.com",
+        "googlesyndication.com",
+        "adservice.google.com",
+        "connect.facebook.net",
+        "scorecardresearch.com",
+        "criteo.com",
+        "taboola.com",
+        "outbrain.com",
+        "cookielaw.org",
+        "onetrust.com",
+        "mixpanel.com",
+        "segment.io",
+        "hotjar.com",
+        "clarity.ms",
+    )
+
+    def interceptRequest(self, info) -> None:  # noqa: N802 (API Qt)
+        host = info.requestUrl().host().lower()
+        if any(host == d or host.endswith("." + d) for d in self._BLOCKED_HOSTS):
+            info.block(True)
+
+
+def _default_data_dir() -> str:
+    """Directorio de datos del usuario (fallback cuando no hay APPDATA)."""
+    return os.path.expanduser("~")
 
 
 # ----------------------------------------------------------------------
@@ -109,7 +164,6 @@ class MiniNewsItem(QFrame):
 
     def mousePressEvent(self, event) -> None:
         if event.button() == Qt.MouseButton.LeftButton:
-            play_click()
             self.selected.emit(self._index)
         super().mousePressEvent(event)
 
@@ -163,17 +217,54 @@ class MiniBrowser(QWidget):
         self._stack.addWidget(self._fallback)
 
         # Mini navegador (Chromium embebido) — disponible si esta instalado
+        # Nota: el view se crea SIN navegar (ADR-009): los procesos de
+        # Chromium arrancan al instanciarlo; la carga real ocurre en
+        # show_article()/prewarm(). JARVIS_DISABLE_WEBENGINE=1 permite
+        # probar la logica completa con el fallback de texto en CI headless.
         self._engine: QWidget | None = None
-        try:
-            from PyQt6.QtCore import QUrl
-            from PyQt6.QtWebEngineWidgets import QWebEngineView
+        if os.environ.get("JARVIS_DISABLE_WEBENGINE") != "1":
+            try:
+                from PyQt6.QtWebEngineCore import (
+                    QWebEngineProfile,
+                    QWebEngineSettings,
+                )
+                from PyQt6.QtWebEngineWidgets import QWebEngineView
 
-            self._engine = QWebEngineView(self._stack)
-            self._engine.setUrl(QUrl("about:blank"))
-            self._engine.setZoomFactor(1.0)
-            self._stack.addWidget(self._engine)
-        except Exception:  # noqa: BLE001  (dependencia opcional ausente)
-            self._engine = None
+                # Perfil persistente: cache HTTP en disco + almacen estable.
+                # La 2a visita de un articulo carga assets desde cache (ADR-009).
+                profile = QWebEngineProfile.defaultProfile()
+                profile.setHttpCacheType(
+                    QWebEngineProfile.HttpCacheType.DiskHttpCache
+                )
+                profile.setHttpCacheMaximumSize(100 * 1024 * 1024)  # 100 MB
+                profile.setPersistentCookiesPolicy(
+                    QWebEngineProfile.PersistentCookiesPolicy.
+                    ForcePersistentCookies
+                )
+                profile.setPersistentStoragePath(
+                    os.path.join(
+                        os.environ.get("APPDATA", _default_data_dir()),
+                        "JarvisLauncher",
+                        "WebEngine",
+                    )
+                )
+                # Bloqueo de rastreadores/publicidad (menos peticiones por pagina)
+                profile.setUrlRequestInterceptor(_TrackerBlocker())
+
+                self._engine = QWebEngineView(self._stack)
+                self._engine.setZoomFactor(1.0)
+                s = self._engine.settings()
+                s.setAttribute(
+                    QWebEngineSettings.WebAttribute.DnsPrefetchEnabled, True
+                )
+                # Sin autoplay de video: menos datos y menos ruido de carga
+                s.setAttribute(
+                    QWebEngineSettings.WebAttribute.PlaybackRequiresUserGesture,
+                    True,
+                )
+                self._stack.addWidget(self._engine)
+            except Exception:  # noqa: BLE001  (dependencia opcional ausente)
+                self._engine = None
 
         root = QVBoxLayout(self)
         root.setContentsMargins(0, 0, 0, 0)
@@ -191,12 +282,22 @@ class MiniBrowser(QWidget):
         """Carga el articulo en el mini navegador (o en el texto de respaldo)."""
         if self._engine is not None:
             self._stack.setCurrentWidget(self._engine)
-            self._engine.setUrl(self._engine.url().__class__(item.url))
+            self._engine.setUrl(QUrl(item.url))
         else:
             self._fallback.setHtml(fallback_html)
             self._stack.setCurrentWidget(self._fallback)
         # Scroll arriba (fallback)
         self._fallback.verticalScrollBar().setValue(0)
+
+    def prewarm(self) -> None:
+        """Calienta Chromium sin navegar a ninguna URL (ADR-009).
+
+        Los procesos del motor (GPU/red/renderer) arrancan al instanciar el
+        QWebEngineView en el constructor; este metodo es la explicita
+        invitacion a no pagar ese arranque en el primer clic del usuario.
+        """
+        if self._engine is None:
+            return
 
     def reload(self) -> None:
         if self._engine is not None:
@@ -399,6 +500,10 @@ class NewsReaderView(QWidget):
         self._rebuild_list()
         self._render_document()
 
+    def prewarm(self) -> None:
+        """Calienta el mini navegador (Chromium) sin abrir el lector."""
+        self._browser.prewarm()
+
     def _rebuild_list(self) -> None:
         # Limpiar mini-items previos
         for i in reversed(range(self._list_layout.count())):
@@ -509,11 +614,9 @@ class NewsReaderView(QWidget):
                 w.set_selected(idx == self._index)
 
     def _reload_page(self) -> None:
-        play_click()
         self._browser.reload()
 
     def _open_original(self) -> None:
-        play_click()
         item = self._items[self._index]
         if item.url:
             webbrowser.open(item.url)

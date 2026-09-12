@@ -48,7 +48,6 @@ from PyQt6.QtWidgets import (
     QFrame,
 )
 
-from core.feedback import play_click
 from core.news import NewsItem, NewsService
 from core.themes import ThemeManager
 
@@ -270,7 +269,6 @@ class NewsItemWidget(QFrame):
 
     def mousePressEvent(self, event) -> None:
         if event.button() == Qt.MouseButton.LeftButton:
-            play_click()
             self.itemClicked.emit(self.item)
         super().mousePressEvent(event)
 

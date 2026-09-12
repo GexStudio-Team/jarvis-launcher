@@ -53,7 +53,6 @@ from PyQt6.QtWidgets import (
     QFrame,
 )
 
-from core.feedback import play_click, play_success, play_error
 from core.greeting import ADJECTIVES, greeting_for
 from core.hotkey import GlobalHotkey
 from core.notifier import notify
@@ -464,6 +463,11 @@ class JarvisUI(QWidget):
         # ---- Lector de articulos (fullscreen, creado bajo demanda) ----
         self._news_reader: NewsReaderView | None = None
 
+        # ---- Pre-warm de Chromium (ADR-009) ----
+        # Calienta el motor web en segundo plano tras el boot para que el
+        # primer clic en una noticia no pague el arranque de Chromium.
+        QTimer.singleShot(900, self._prewarm_webengine)
+
         # Insertar segun posicion
         self._apply_news_panel_position()
 
@@ -641,7 +645,6 @@ class JarvisUI(QWidget):
         """Abre el lector de noticias a pantalla completa sobre el launcher."""
         if not items:
             return
-        play_click()
         if self._news_reader is None:
             self._news_reader = NewsReaderView(self._theme, self)
             self._news_reader.closeRequested.connect(self._close_reader)
@@ -650,14 +653,25 @@ class JarvisUI(QWidget):
         self._news_reader.update_position()
         self._news_reader.show()
         self._news_reader.raise_()
-        # Fade de entrada con windowOpacity (nativa, ADR-001)
+        # Fade de entrada corto (110 ms, ADR-009): respuesta casi instantanea
         fade = QPropertyAnimation(self._news_reader, b"windowOpacity")
-        fade.setDuration(220)
+        fade.setDuration(110)
         fade.setStartValue(0.0)
         fade.setEndValue(1.0)
         fade.setEasingCurve(QEasingCurve.Type.OutCubic)
         fade.start()
         self._reader_fade = fade
+
+    def _prewarm_webengine(self) -> None:
+        """Calienta Chromium en segundo plano tras el boot (ADR-009).
+
+        El primer clic en una noticia solo navega a la URL (setUrl); el
+        arranque de los procesos de Chromium ya ocurrio oculto aqui.
+        """
+        if self._news_reader is None:
+            self._news_reader = NewsReaderView(self._theme, self)
+            self._news_reader.closeRequested.connect(self._close_reader)
+        self._news_reader.hide()
 
     def _close_reader(self) -> None:
         """Vuelve del lector al launcher."""
@@ -668,7 +682,6 @@ class JarvisUI(QWidget):
 
     def open_settings(self) -> None:
         """Ruedita de ajustes."""
-        play_click()
         dlg = SettingsDialog(self._settings, self._theme, self)
         dlg.exec()
 
@@ -698,7 +711,6 @@ class JarvisUI(QWidget):
         )
 
     def _open_connect_dialog(self) -> None:
-        play_click()
         dlg = ConnectDialog(self._settings, self._theme, self)
         if dlg.exec() == SettingsDialog.DialogCode.Accepted:
             self._settings.news_enabled = True
@@ -821,7 +833,6 @@ class JarvisUI(QWidget):
     def _on_card_clicked(self, mode_id: str) -> None:
         if self._is_launching:
             return
-        play_click()
         self._is_launching = True
         self._launch_message = ""
 
@@ -865,7 +876,6 @@ class JarvisUI(QWidget):
                 f"{len(failed)} fallaron"
             )
             self._status_label.setText(self._launch_message)
-            play_error()
             notify(
                 "J.A.R.V.I.S.",
                 f"{mode_name}: {len(launched)} apps abiertas, "
@@ -876,7 +886,6 @@ class JarvisUI(QWidget):
                 f"{mode_name} COMPLETADO: {len(launched)} apps abiertas"
             )
             self._status_label.setText(self._launch_message)
-            play_success()
             notify(
                 "J.A.R.V.I.S.",
                 f"{mode_name} listo: {len(launched)} apps abiertas.",
