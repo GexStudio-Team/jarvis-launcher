@@ -4,7 +4,7 @@ Interfaz tipo JARVIS (Iron Man) que se ejecuta al iniciar Windows y permite lanz
 
 ## Caracteristicas
 
-- Interfaz fullscreen con efectos HUD: anillos rotantes, particulas flotantes, linea de escaneo
+- Interfaz fullscreen que **tapa toda la vista** (modo foco) con efectos HUD: anillos rotantes, particulas flotantes, linea de escaneo
 - Pantalla de boot animada tipo arranque de sistema (barra de progreso)
 - Greeting con efecto typewriter
 - 3 modos predefinidos: Gaming, Trabajo, Estudio (personalizables via `config.json`)
@@ -27,9 +27,9 @@ Interfaz tipo JARVIS (Iron Man) que se ejecuta al iniciar Windows y permite lanz
   propia URL RSS/Atom (se valida antes de conectar)
 - **Temas de color**: 8 paletas (obsidiana, nocturno, crimson, esmeralda,
   matriz, violeta, ambar, luz, nieve) selectables desde la rueda de ajustes ⚙
-- **Siempre al frente + bandeja del sistema**: el launcher queda encima de todo;
-  al pulsar ✕ se oculta a la bandeja y sigue activo (doble clic en el icono
-  para volverlo a abrir)
+- **Siempre al frente + bandeja del sistema**: el launcher queda encima de todo
+  y ocupa toda la pantalla; al pulsar ✕ se oculta a la bandeja y sigue activo
+  (doble clic en el icono para volverlo a abrir)
 - **Atajo global `Ctrl+Shift+Espacio`**: convoca u oculta el launcher desde
   cualquier aplicación
 - **Saludo dinámico**: "Buenos días/tardes/noches" según la hora, con adjetivo
@@ -43,11 +43,14 @@ Interfaz tipo JARVIS (Iron Man) que se ejecuta al iniciar Windows y permite lanz
   bandeja configurables
 - **Lector de noticias con mini navegador**: haz clic en cualquier noticia del
   panel y se abre a pantalla completa un **navegador embebido con el artículo
-  real** (imágenes, videos y todo el contenido del sitio). Lista lateral para
-  cambiar de artículo al instante, botón **⟳** para recargar y
-  **ABRIR ORIGINAL ↗** para verlo en tu navegador habitual.
+  real** (imágenes, videos y todo el contenido del sitio). Cambia de artículo
+  **al instante** (el resumen aparece de inmediato y la página completa salta
+  cuando termina de cargar), botón **⟳** para recargar y **ABRIR ORIGINAL ↗**
+  para verlo en tu navegador habitual.
   *El panel lateral se mantiene limpio: fuente, hora y título de cada noticia
   (sin textos apilados); lo completo se lee en el lector.*
+- **Noticias rápidas**: las fuentes se descargan en paralelo (solo esperas a
+  la más lenta) y la primera carga del panel llega en segundos
 
 ## Requisitos
 

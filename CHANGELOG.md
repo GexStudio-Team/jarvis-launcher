@@ -6,6 +6,87 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/).
 
 ---
 
+## [2.0.2] - 2026-09-11 (America/Bogota)
+
+### Fixed
+- **Bug G-001 — la app se cerraba al cambiar la fuente de noticias**:
+  `JarvisUI` no tenía el método público `apply_news_panel()` que invocaban el
+  flujo de conexión (`jarvis_ui._open_connect_dialog`) y el diálogo de Ajustes
+  (`settings_dialog._apply_and_close`); el `AttributeError` resultante cerraba
+  el launcher al aceptar "CONECTAR" o "Aplicar". Ahora `apply_news_panel()` es
+  API pública y delega en `_apply_news_panel_position()`.
+- **Bug G-002 — el launcher se veía como "ventana flotante"**:
+  `_center_on_screen()` limitaba la geometría a 1480×920 centrada; ahora la
+  ventana (frameless y siempre al frente) se expande a la geometría completa
+  del monitor activo y **tapa toda la vista** (modo foco total). El tamaño
+  mínimo se calcula relativo a la pantalla (no falla en monitores pequeños).
+- **Bug G-003 — las noticias no se actualizaban en la UI hasta reiniciar**:
+  al guardar ajustes, el panel no se re-aplicaba ni re-descargaba. `Aplicar`
+  ahora ejecuta `apply_news_panel()` (posición/visibilidad) y `refresh_news()`
+  (descarga en vivo) sobre el padre `JarvisUI`.
+
+### Added
+- **Mensaje de la comunidad (ADR-011)** — a partir de esta versión cada
+  release incluye un apartado de **GexStudio Team** dirigido a la comunidad
+  (véase abajo), como parte de la metodología de documentación de releases.
+
+### Changed (rendimiento de noticias)
+- **G-004 — descarga de fuentes en paralelo**: `NewsService.fetch_sources`
+  ahora descarga las fuentes de forma **concurrente** (`ThreadPoolExecutor`,
+  máx. 6 workers) en vez de en serie. El tiempo total pasa de la *suma* de
+  latencias a ~el *máximo*: 12 fuentes que antes tardaban ~4–8 s cargan en
+  ~2 s (medido en offscreen). Las fuentes duplicadas por URL solo se
+  descargan una vez; el caché de 600 s se conserva.
+- **G-005 — cambio de artículo instantáneo en el lector**: al pasar de una
+  noticia a otra, el lector muestra **al instante (≈1 ms)** el resumen del
+  feed con la tipografía del tema y carga la página real (**web completa**)
+  en segundo plano; salta a ella cuando termina de cargar. Antes cada cambio
+  esperaba la descarga de red completa sin mostrar nada (varios segundos).
+
+---
+
+## 🎙️ GexStudio Team — mensaje a la comunidad
+
+¡Buenas noches, comunidad GexStudio! 🌙
+
+Esta semana estuvimos de guardia con el launcher y, como siempre, ustedes
+fueron los primeros en avisar. Detectamos tres cosas que no nos dejaban
+dormir tranquilos:
+
+1. **Al cambiar el motor de noticias, J.A.R.V.I.S. se cerraba.** Malísimo:
+   justo cuando ibas a conectar tu fuente favorita, adiós. Un método que el
+   diálogo de Ajustes y el flujo de conexión esperaban no existía; el error
+   tumbaba todo el launcher.
+2. **La ventana se veía como una ventanita flotante.** J.A.R.V.I.S. nació
+   para ser un HUD: ahora **tapa toda la vista**, pantalla completa, siempre
+   al frente, como debe ser.
+3. **Las noticias no se actualizaban solas.** Cambiabas la fuente o la
+   posición del panel, cerrabas, y hasta volver a entrar no se veía nada.
+   Ahora al aplicar ajustes el panel reacciona **al instante**.
+
+Y, para no irnos con las manos vacías, aprovechamos la misma ronda para
+hablar del otro tema que nos contaron por ahí: **"las noticias cargan muy
+lento"**. Dos cirugías:
+
+4. **El panel descarga las fuentes en paralelo.** Antes cada fuente se pedía
+   una detrás de otra; si una se dormía, las demás hacían fila. Ahora todas
+   se descargan al mismo tiempo y solo se espera a la más lenta: la primera
+   carga del panel bajó de la *suma* de tiempos a **~el doble de la fuente
+   más lenta** (12 fuentes: ~2 s en pruebas).
+5. **El lector te enseña sin esperar.** Al cambiar de artículo ya no aparece
+   la pantalla en blanco hasta que baja la página: ves **al momento** el
+   resumen con la tipografía del launcher y, mientras tanto, la web completa
+   se carga por detrás y salta sola. Cambiar de noticia ahora es **instantáneo**.
+
+Todo corregido, probado y documentado: cada uno de estos arreglos quedó
+registrado en el changelog con su identificador (G-001…G-005) y la decisión
+técnica del modo foco total quedó sellada en el ADR-011.
+
+Que J.A.R.V.I.S. te acompañe en el modo foco, comunidad. Hasta la próxima
+entrega. 🖤
+
+---
+
 ## [2.0.1] - 2026-09-11 (America/Bogota)
 
 ### Added

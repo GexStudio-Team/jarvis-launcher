@@ -13,10 +13,12 @@ Incluye panel lateral de noticias RSS (presets o URL propia), temas de color
 seleccionables desde la interfaz y panel de control (rueda ⚙).
 
 Desde la v2.0.0 (modo workspace / foco) incorpora además:
-- **Comportamiento de ventana**: el launcher queda SIEMPRE al frente y se oculta
-  al elegir un modo; se invoca desde el atajo global `Ctrl+Shift+Espacio`
-  (`core/hotkey.py`) o desde la bandeja del sistema (`core/tray.py`); el ✕ oculta
-  a la bandeja en lugar de cerrar.
+- **Comportamiento de ventana (modo foco total, ADR-011)**: el launcher queda
+  SIEMPRE al frente, frameless y **tapa toda la vista** (geometría completa
+  del monitor activo, `_center_on_screen`); se oculta al elegir un modo; se
+  invoca desde el atajo global `Ctrl+Shift+Espacio` (`core/hotkey.py`) o desde
+  la bandeja del sistema (`core/tray.py`); el ✕ oculta a la bandeja en lugar
+  de cerrar.
 - **Saludo dinámico**: por franja horaria + adjetivo profesional rotativo
   (`core/greeting.py`), sustituido por el **nombre real** cuando la cuenta de
   GitHub está vinculada (`core/github_link.py`).
@@ -165,6 +167,11 @@ flowchart TD
   `time_ago()` para la UI.
 - `PRESET_SOURCES`: 10 fuentes predefinidas; soporta URL propia (validación
   con lectura real del feed).
+- **Descarga concurrente (v2.0.2 / G-004)**: `fetch_sources` ejecuta las
+  fuentes en paralelo con `ThreadPoolExecutor` (máx. 6 workers, urllib
+  libera el GIL en I/O)→ el tiempo total ≈ el *máximo* de latencias, no la
+  *suma*; fuentes duplicadas por URL se descargan una sola vez y el caché de
+  600 s se conserva.
 - Ver también: [ADR-005](./ADR-005-panel-noticias-rss.md).
 
 ### `core/config.py` — `ConfigManager`
@@ -207,7 +214,8 @@ flowchart TD
 - `notify(title, message)`: solo en `win32`; fallback silencioso si falla.
 
 ### `ui/jarvis_ui.py`
-- `JarvisUI` (QWidget a pantalla completa, frameless):
+- `JarvisUI` (QWidget a pantalla completa — geometría total del monitor,
+  frameless, ADR-011):
   - Layout compacto: barra superior (logo, ruedita ⚙, auto-inicio, cerrar),
     título, tarjetas centradas, barra de estado y **panel de noticias lateral**.
   - Temas consumidos vía `ThemeManager`; `apply_theme()` re-pinta fondos
@@ -279,6 +287,11 @@ flowchart TD
   CSS y contenido completo) en Chromium; sin la dependencia, muestra el HTML
   de lectura larga v2 (lead con capitular, pull-quote). El módulo se importa
   en el constructor (try/except, lazy).
+- **Cambio de artículo instantáneo (v2.0.2 / G-005)**: `show_article` muestra
+  **al instante** el resumen del feed (HTML local del tema) y carga la URL
+  real en segundo plano; `_on_web_finished` (guard por `_load_seq`) salta a la
+  web cuando termina. Si el artículo ya estaba cargado, se reutiliza sin
+  re-descargar.
 - **Optimizaciones de rendimiento (ADR-009)** — el primer clic "frío"
   (arranque de Chromium) se elimina:
   - El view **no navega en el constructor**: los procesos del motor arrancan

@@ -207,6 +207,12 @@ class MiniBrowser(QWidget):
         self._theme = theme
         self._stack = QStackedWidget(self)
 
+        # Secuencia de carga en segundo plano (perf v2.0.2 / G-005):
+        # al cambiar de articulo se muestra el resumen local al instante y la
+        # pagina real salta cuando termina de cargar (_on_web_finished).
+        self._load_seq = 0
+        self._pending_cb: tuple[int, str] | None = None
+
         # Fallback: lectura del feed (resumen con tipografia del tema)
         self._fallback = QTextBrowser(self._stack)
         self._fallback.setFrameShape(QFrame.Shape.NoFrame)
@@ -263,6 +269,8 @@ class MiniBrowser(QWidget):
                     True,
                 )
                 self._stack.addWidget(self._engine)
+                # Switch automatico resumen -> pagina real cuando termina la carga
+                self._engine.loadFinished.connect(self._on_web_finished)
             except Exception:  # noqa: BLE001  (dependencia opcional ausente)
                 self._engine = None
 
@@ -279,15 +287,42 @@ class MiniBrowser(QWidget):
         return self._engine is not None
 
     def show_article(self, item: NewsItem, fallback_html: str) -> None:
-        """Carga el articulo en el mini navegador (o en el texto de respaldo)."""
+        """Carga el articulo con cambio INSTANTANEO (perf v2.0.2, G-005).
+
+        1. Muestra al momento el resumen del feed (render local, 0 ms),
+        2. navega a la URL real en segundo plano y
+        3. salta a la pagina completa cuando termina de cargar
+           (`_on_web_finished`, guard por secuencia si el usuario cambio
+           de articulo mientras cargaba).
+        """
+        self._load_seq += 1
+        seq = self._load_seq
+        url = item.url or ""
+        self._pending_cb = (seq, url)
+
         if self._engine is not None:
-            self._stack.setCurrentWidget(self._engine)
-            self._engine.setUrl(QUrl(item.url))
+            # 1) Resumen local al instante (tipografia del tema activo)
+            self._stack.setCurrentWidget(self._fallback)
+            self._fallback.setHtml(fallback_html)
+            self._fallback.verticalScrollBar().setValue(0)
+            # 2) Si la pagina real ya estaba cargada (mismo articulo), mostrarla
+            if self._engine.url().toString() == url:
+                self._stack.setCurrentWidget(self._engine)
+            else:
+                self._engine.setUrl(QUrl(url))
         else:
             self._fallback.setHtml(fallback_html)
             self._stack.setCurrentWidget(self._fallback)
-        # Scroll arriba (fallback)
-        self._fallback.verticalScrollBar().setValue(0)
+            self._fallback.verticalScrollBar().setValue(0)
+
+    def _on_web_finished(self, ok: bool) -> None:
+        """Pagina real lista -> la muestra sobre el resumen (si sigue actual)."""
+        cb = self._pending_cb
+        self._pending_cb = None
+        if not ok or cb is None or self._engine is None:
+            return
+        if self._stack.currentWidget() is self._fallback:
+            self._stack.setCurrentWidget(self._engine)
 
     def prewarm(self) -> None:
         """Calienta Chromium sin navegar a ninguna URL (ADR-009).
