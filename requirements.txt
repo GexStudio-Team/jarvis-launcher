@@ -1,1 +1,6 @@
 PyQt6>=6.5.0
+
+# Mini navegador embebido del lector de noticias (imagenes y articulos
+# completos dentro del launcher). Es OPCIONAL: si no se instala, el lector
+# funciona igual con el resumen del feed (modo texto).
+PyQt6-WebEngine>=6.7

@@ -61,6 +61,9 @@
 - [x] v2: atajos del lector (Escape cierra, flechas navegan) priorizados en JarvisUI; fade windowOpacity (ADR-001)
 - [x] v2: tests offscreen lector (render, splitter, navegacion, temas, respaldo sin summary) + integracion con JarvisUI 0 errores
 - [x] v2: docs ADR-007 (lector), Arquitectura (news_reader + flujo), CHANGELOG [Unreleased], README
+- [x] v2: **mini navegador embebido** — `PyQt6-WebEngine` instalado (6.11); `MiniBrowser` con `QWebEngineView` carga la URL real del articulo (imagenes y todo); fallback a QTextBrowser si no esta instalado; `AA_ShareOpenGLContexts` en main
+- [x] v2: **panel de noticias des saturado** — sin preview apilado (fuente+hora+titulo), altura 88px, spacing 10, 12 items; lo completo se lee en el lector
+- [x] v2: docs ADR-008 (webengine), Arquitectura y README actualizados (requisitos + lector)
 
 ## En progreso
 

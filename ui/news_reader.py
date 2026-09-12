@@ -1,28 +1,24 @@
 """
 ui/news_reader.py - Lector de noticias a pantalla completa (spec v2, pts. 3-4).
 
-Decisiones del diseno v2 (ver ADR de la rama feat/news-reader):
-  - C1: split-pane redimensionable — lista compacta a la izquierda y lectura
-    larga a la derecha (QSplitter), navegando sin volver al panel.
-  - B4: el contenido mostrado es el que trae el feed (summary/lead + body);
-    cuando el feed no incluye el cuerpo completo, el boton "Abrir original"
-    deja la lectura en el navegador.
-  - Tipografia de lectura larga: titulo grande, meta en dim, LEAD destacado
-    con capitular + barra de acento, PULL-QUOTE en cursiva y divisores
-    tipograficos. La busca leer sin filas de 80 caracteres: columna centrada
-    y aire lateral.
-
-Restricciones mantenidas: sin QGraphicsEffect (ADR-001), cero dependencias
-nuevas (PyQt6 + stdlib), colores siempre del ThemeManager activo.
+En esta etapa el lector embebe un **mini navegador** (Chromium via
+PyQt6-WebEngine / QWebEngineView) para ver el articulo completo desde Jarvis
+con imagenes, CSS y todo el contenido real del sitio. Si PyQt6-WebEngine no
+esta instalado, cae elegantemente al lector de texto (resumen del feed).
 
 Estructura
 ----------
 NewsReaderView (QWidget a pantalla completa):
-  - Header: boton VOLVER, fuente + hora del articulo, boton ABRIR ORIGINAL.
+  - Header: boton VOLVER, fuente + hora del articulo, recargar (⟳) y
+    ABRIR ORIGINAL (navegador externo).
   - QSplitter horizontal redimensionable:
       * Panel izquierdo (lista): MiniNewsItem apilados; el actual resaltado.
-      * Panel derecho (lectura): QTextBrowser con el articulo en HTML del tema.
+      * Panel derecho: _MiniBrowser con Chromium embebido (o fallback texto).
   - Navegacion: <- / -> cambian de articulo; Escape vuelve al launcher.
+
+Restricciones mantenidas: sin QGraphicsEffect (ADR-001); colores del
+ThemeManager activo en toda la UI propia; PyQt6-WebEngine es la unica
+dependencia opcional agregada (el fallback la hace no critica).
 """
 
 from __future__ import annotations
@@ -39,6 +35,7 @@ from PyQt6.QtWidgets import (
     QPushButton,
     QScrollArea,
     QSplitter,
+    QStackedWidget,
     QTextBrowser,
     QVBoxLayout,
     QWidget,
@@ -134,6 +131,86 @@ class MiniNewsItem(QFrame):
 
 
 # ----------------------------------------------------------------------
+# Mini navegador embebido (Chromium) con fallback de texto
+# ----------------------------------------------------------------------
+
+
+class MiniBrowser(QWidget):
+    """
+    Muestra el articulo completo dentro del launcher.
+
+    - Si PyQt6-WebEngine esta disponible: QWebEngineView cargando la URL
+      real del articulo (imagenes, CSS, videos embebidos...).
+    - Si no: QTextBrowser con el resumen del feed (modo lectura ligera).
+    """
+
+    def __init__(
+        self,
+        theme: ThemeManager,
+        parent: QWidget | None = None,
+    ) -> None:
+        super().__init__(parent)
+        self._theme = theme
+        self._stack = QStackedWidget(self)
+
+        # Fallback: lectura del feed (resumen con tipografia del tema)
+        self._fallback = QTextBrowser(self._stack)
+        self._fallback.setFrameShape(QFrame.Shape.NoFrame)
+        self._fallback.setOpenExternalLinks(False)
+        self._fallback.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+        )
+        self._stack.addWidget(self._fallback)
+
+        # Mini navegador (Chromium embebido) — disponible si esta instalado
+        self._engine: QWidget | None = None
+        try:
+            from PyQt6.QtCore import QUrl
+            from PyQt6.QtWebEngineWidgets import QWebEngineView
+
+            self._engine = QWebEngineView(self._stack)
+            self._engine.setUrl(QUrl("about:blank"))
+            self._engine.setZoomFactor(1.0)
+            self._stack.addWidget(self._engine)
+        except Exception:  # noqa: BLE001  (dependencia opcional ausente)
+            self._engine = None
+
+        root = QVBoxLayout(self)
+        root.setContentsMargins(0, 0, 0, 0)
+        root.addWidget(self._stack)
+
+    # ------------------------------------------------------------------
+    # API
+    # ------------------------------------------------------------------
+
+    @property
+    def uses_webengine(self) -> bool:
+        return self._engine is not None
+
+    def show_article(self, item: NewsItem, fallback_html: str) -> None:
+        """Carga el articulo en el mini navegador (o en el texto de respaldo)."""
+        if self._engine is not None:
+            self._stack.setCurrentWidget(self._engine)
+            self._engine.setUrl(self._engine.url().__class__(item.url))
+        else:
+            self._fallback.setHtml(fallback_html)
+            self._stack.setCurrentWidget(self._fallback)
+        # Scroll arriba (fallback)
+        self._fallback.verticalScrollBar().setValue(0)
+
+    def reload(self) -> None:
+        if self._engine is not None:
+            self._engine.reload()
+
+    def set_theme(self, theme: ThemeManager) -> None:
+        self._theme = theme
+        them = self._theme.theme
+        self._fallback.setStyleSheet(
+            f"QTextBrowser {{ background: {them.bg}; }}"
+        )
+
+
+# ----------------------------------------------------------------------
 # Lector principal (fullscreen, split-pane)
 # ----------------------------------------------------------------------
 
@@ -174,7 +251,7 @@ class NewsReaderView(QWidget):
 
         root.addLayout(self._build_header())
 
-        # Split-pane: lista | lectura
+        # Split-pane: lista | mini navegador
         self._splitter = QSplitter(Qt.Orientation.Horizontal, self)
         self._splitter.setChildrenCollapsible(False)
 
@@ -191,23 +268,19 @@ class NewsReaderView(QWidget):
         self._list_layout.addStretch()
         self._list_area.setWidget(self._list_container)
 
-        self._doc_area = QScrollArea(self._splitter)
-        self._doc_area.setWidgetResizable(True)
-        self._doc_area.setFrameShape(QFrame.Shape.NoFrame)
-        self._doc = QTextBrowser(self._doc_area)
-        self._doc.setOpenExternalLinks(False)
-        self._doc.setFrameShape(QFrame.Shape.NoFrame)
-        self._doc.setHorizontalScrollBarPolicy(
-            Qt.ScrollBarPolicy.ScrollBarAlwaysOff
-        )
-        self._doc_area.setWidget(self._doc)
+        self._browser = MiniBrowser(self._theme, self._splitter)
 
         self._splitter.addWidget(self._list_area)
-        self._splitter.addWidget(self._doc_area)
+        self._splitter.addWidget(self._browser)
         self._splitter.setStretchFactor(0, 0)
         self._splitter.setStretchFactor(1, 1)
         self._splitter.setSizes([self.DEFAULT_LIST, 800])
         root.addWidget(self._splitter, 1)
+
+        # Feedback ligero de carga del mini navegador
+        if (engine := getattr(self._browser, "_engine", None)) is not None:
+            engine.loadStarted.connect(self._on_load_started)
+            engine.loadFinished.connect(self._on_load_finished)
 
         self._apply_theme()
 
@@ -227,6 +300,13 @@ class NewsReaderView(QWidget):
         )
         header.addWidget(self._meta_label, 1)
 
+        self._reload_btn = QPushButton("⟳", self)
+        self._reload_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._reload_btn.setFixedSize(34, 34)
+        self._reload_btn.setToolTip("Recargar el articulo en el mini navegador")
+        self._reload_btn.clicked.connect(self._reload_page)
+        header.addWidget(self._reload_btn)
+
         self._open_btn = QPushButton("ABRIR ORIGINAL ↗", self)
         self._open_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._open_btn.setFixedHeight(34)
@@ -243,8 +323,6 @@ class NewsReaderView(QWidget):
     def set_theme(self, theme: ThemeManager) -> None:
         self._theme = theme
         self._apply_theme()
-        if self._items:
-            self._render_document()
 
     def _apply_theme(self) -> None:
         them = self._theme.theme
@@ -271,6 +349,22 @@ class NewsReaderView(QWidget):
                 }}
                 """
             )
+        self._reload_btn.setStyleSheet(
+            f"""
+            QPushButton {{
+                background: transparent;
+                color: {them.text_dim};
+                border: 1px solid {them.card_border};
+                border-radius: 8px;
+                font-size: 15px;
+                font-weight: bold;
+            }}
+            QPushButton:hover {{
+                color: {them.accent};
+                border-color: {them.accent};
+            }}
+            """
+        )
         self._meta_label.setStyleSheet(
             f"background: transparent; border: none; color: {them.text_dim};"
             f"font-size: 11px; letter-spacing: 1px;"
@@ -286,14 +380,11 @@ class NewsReaderView(QWidget):
         self._list_area.viewport().setStyleSheet(
             f"background: {them.bg_alt}; border: none;"
         )
-        # Lectura
-        self._doc_area.setStyleSheet("QScrollArea { background: transparent; border: none; }")
-        self._doc_area.viewport().setStyleSheet("background: transparent; border: none;")
-        split_handle = f"background: {them.card_border}; width: 2px;"
+        # Splitter + navegador
         self._splitter.setStyleSheet(
-            f"QSplitter::handle {{ {split_handle} }}"
+            f"QSplitter::handle {{ background: {them.card_border}; width: 2px; }}"
         )
-        self._doc.viewport().setAutoFillBackground(False)
+        self._browser.set_theme(self._theme)
 
     # ------------------------------------------------------------------
     # Datos
@@ -322,10 +413,6 @@ class NewsReaderView(QWidget):
             w.set_selected(idx == self._index)
             self._list_layout.insertWidget(idx, w)
 
-    # ------------------------------------------------------------------
-    # Conenido del articulo
-    # ------------------------------------------------------------------
-
     def _render_document(self) -> None:
         if not self._items:
             return
@@ -335,20 +422,18 @@ class NewsReaderView(QWidget):
         self._meta_label.setText(
             f"{item.source.upper()}  ·  {item.published}"
         )
-        self._doc.setHtml(self._build_article_html(item, them))
-
-        # Scroll arriba al cambiar de articulo
-        self._doc.verticalScrollBar().setValue(0)
+        self._browser.show_article(
+            item, self._build_article_html(item, them)
+        )
         self._sync_list_selection()
+
+    # ------------------------------------------------------------------
+    # Fallback de texto (cuando no hay mini navegador)
+    # ------------------------------------------------------------------
 
     @staticmethod
     def _split_readable(summary: str) -> tuple[str, str, str]:
-        """Divide el resumen en (lead, pull_quote, body).
-
-        - lead: primeras ~2 oraciones (gancho destacado).
-        - pull_quote: primera oracion citable (si hay mas de una).
-        - body: el resto como parrafo de lectura.
-        """
+        """Divide el resumen en (lead, pull_quote, body)."""
         sentences = [s.strip() for s in summary.split(". ") if s.strip()]
         if len(sentences) <= 1:
             return summary, "", ""
@@ -361,14 +446,11 @@ class NewsReaderView(QWidget):
         summary = (item.extra.get("summary") or "").strip()
         lead, quote, body = self._split_readable(summary)
 
-        # Fallo de contenido: si no hay resumen, se muestra el titulo y el
-        # boton "Abrir original" queda como camino principal.
         if not summary:
             lead = "El feed no incluye el resumen de este articulo."
             quote = ""
 
         title = _html.escape(item.title)
-        # Capitular: primera letra del lead en grande (hook tipografico inline)
         if lead:
             cap = _html.escape(lead[0])
             rest = _html.escape(lead[1:])
@@ -418,7 +500,7 @@ class NewsReaderView(QWidget):
             return
         self._index = index
         self._render_document()
-        self._doc.setFocus()
+        self.setFocus()
 
     def _sync_list_selection(self) -> None:
         for idx in range(self._list_layout.count()):
@@ -426,11 +508,31 @@ class NewsReaderView(QWidget):
             if isinstance(w, MiniNewsItem):
                 w.set_selected(idx == self._index)
 
+    def _reload_page(self) -> None:
+        play_click()
+        self._browser.reload()
+
     def _open_original(self) -> None:
         play_click()
         item = self._items[self._index]
         if item.url:
             webbrowser.open(item.url)
+
+    def _on_load_started(self) -> None:
+        self._meta_label.setText("Cargando articulo…")
+
+    def _on_load_finished(self, ok: bool) -> None:
+        item = self._items[self._index] if self._items else None
+        if item is None:
+            return
+        if ok:
+            self._meta_label.setText(
+                f"{item.source.upper()}  ·  {item.published}"
+            )
+        else:
+            self._meta_label.setText(
+                f"No se pudo cargar · {item.source.upper()} · use ABRIR ORIGINAL"
+            )
 
     def update_position(self) -> None:
         """Reacomoda el lector al tamano de su padre (fullscreen)."""

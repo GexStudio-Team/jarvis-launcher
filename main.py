@@ -11,6 +11,7 @@ import socket
 import logging
 import threading
 
+from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QApplication
 
 # Asegurar que los modulos del proyecto estan en el path
@@ -121,7 +122,12 @@ def main() -> int:
     config = ConfigManager()
     logger.info(f"Configuracion cargada: {config.app_name}")
 
-    # Crear app Qt
+    # Crear app Qt.
+    # AA_ShareOpenGLContexts DEBE activarse antes de crear la app: lo exige
+    # el mini navegador embebido (PyQt6-WebEngine / QWebEngineView).
+    QApplication.setAttribute(
+        Qt.ApplicationAttribute.AA_ShareOpenGLContexts, True
+    )
     app = QApplication(sys.argv)
     app.setApplicationName("J.A.R.V.I.S. Launcher")
     app.setApplicationVersion(config._config.get("version", "1.0.0"))

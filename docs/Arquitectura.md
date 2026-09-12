@@ -252,32 +252,40 @@ flowchart TD
 - Descarga en hilo daemon → entrega al hilo UI vía señal `_itemsFetched`
   (nunca se tocan widgets desde el hilo de trabajo).
 - Refresh automático cada 10 min + botón manual; timer y estados visibles.
-- **Jerarquía limpia v2**: cabecera "¿QUÉ ESTÁ PASANDO EN EL MUNDO AHORA?";
-  cada `NewsItemWidget` muestra fuente + hora en dim, título destacado de 2
-  líneas y preview del resumen (si el feed lo incluye); hover resaltado y
-  **clic emite `readerRequested(items, index)`** para abrir el lector de
-  artículos (`NewsReaderView`), que mantiene el enlace original.
+- **Anti-saturación**: cada `NewsItemWidget` muestra fuente + hora en dim y
+  título destacado (2 líneas) — **sin preview apilado**; tarjeta de 88 px,
+  spacing 10 y lista limitada a 12 noticias. El resumen y el contenido real
+  viven en el lector (`NewsReaderView`).
+- **Clic emite `readerRequested(items, index)`** para abrir el lector con el
+  mini navegador (`NewsReaderView`).
 - `EmptyNewsView`: estado vacío sobrio ("◉") con botón CONFIG (emite
   `configureRequested` → abre `ConnectDialog`).
 - Ver también: [ADR-005](./ADR-005-panel-noticias-rss.md),
-  [ADR-007](./ADR-007-lector-noticias.md).
+  [ADR-007](./ADR-007-lector-noticias.md),
+  [ADR-008](./ADR-008-webengine.md).
 
-### `ui/news_reader.py` — `NewsReaderView`
+### `ui/news_reader.py` — `NewsReaderView` / `MiniBrowser`
 - **Lector de noticias a pantalla completa** (spec v2 pts. 3-4), hijo overlay
   de `JarvisUI` (mismo patrón que `BootOverlay`): `setGeometry(parent.rect())`
   + `raise_()`; fade de entrada con `windowOpacity` (ADR-001).
 - **Split-pane redimensionable** (`QSplitter` horizontal, handle estilizado
-  del tema): lista compacta izquierda (`MiniNewsItem`, 180–380 px) + lectura
-  larga derecha (`QTextBrowser`); columna centrada ~760 px.
-- **Contenido desde el feed** (decisión B3 del ADR-007): `extra["summary"]`
-  dividido por `_split_readable()` en lead (2 oraciones), pull-quote (primera
-  oración) y cuerpo; **capitular** en acento y cita en cursiva con barra
-  lateral; si no hay resumen, aviso neutro + botón **"Abrir original ↗"**
-  (`webbrowser.open`) como camino principal.
-- HTML generado con los colores del `ThemeManager` activo (`set_theme`);
-  navegación `←`/`→` y `Escape` (señal `closeRequested`); scroll arriba al
-  cambiar de artículo.
-- Ver también: [ADR-007](./ADR-007-lector-noticias.md).
+  del tema): lista compacta izquierda (`MiniNewsItem`, 180–380 px) + **mini
+  navegador embebido** a la derecha.
+- **Mini navegador (`MiniBrowser`)** — decisión del ADR-008: `QStackedWidget`
+  con `QWebEngineView` (Chromium, PyQt6-WebEngine) **o** `QTextBrowser`
+  (fallback con el resumen del feed). `show_article(item, html)` carga la
+  **URL real del artículo** (imágenes, CSS y contenido completo) en Chromium;
+  sin la dependencia, muestra el HTML de lectura larga v2 (lead con capitular,
+  pull-quote). El módulo se importa en el constructor (try/except, lazy).
+- Encabezado: **← VOLVER**, fuente·hora (con estado "Cargando artículo…"),
+  **⟳** recargar y **ABRIR ORIGINAL ↗** (`webbrowser.open`).
+- Navegación `←`/`→` y `Escape` (señal `closeRequested`); clic en la lista
+  también navega; HTML de respaldo generado con los colores del tema
+  (`set_theme`).
+- `main.py` activa `AA_ShareOpenGLContexts` antes de crear `QApplication`
+  (requisito del WebEngine).
+- Ver también: [ADR-007](./ADR-007-lector-noticias.md),
+  [ADR-008](./ADR-008-webengine.md).
 
 ### `ui/settings_dialog.py` — `SettingsDialog` / `ConnectDialog` / `GithubDialog`
 - `SettingsDialog` (modal, rueda ⚙): **lista estructurada v2** con filas
@@ -383,11 +391,12 @@ Resumen de categorías vigentes (verificado al 2026-09-11):
   offscreen; falta validación interactiva en Windows real (mensaje `WM_HOTKEY`
   y notificaciones de bandeja). Probar sin conflictos con otro proceso usando
   `Ctrl+Shift+Espacio` (el registro fallido se loguea como advertencia).
-- **Lector de noticias v2** (spec puntos 3 y 4): implementado en
-  `ui/news_reader.py` (split-pane, lectura larga, "Abrir original"); la
-  validación visual final en pantalla real queda pendiente. Deuda técnica
-  registrada en ADR-007: el cuerpo offline completo requeriría un extractor de
-  contenido de la URL del artículo (dependencia nueva, fuera de esta fase).
+- **Lector de noticias v2** (spec puntos 3 y 4): implementado con **mini
+  navegador embebido** (`PyQt6-WebEngine`, o fallback texto) y panel
+  des saturado; validación visual de la navegación real (`setUrl` → contenido
+  cargado) en pantalla de escritorio pendiente.
+- **Dependencias**: `PyQt6-WebEngine` agregado como opcional (ADR-008); en
+  entornos sin GPU Chromium cae a software (warnings). 
 - **Temas**: soporte de tema claro con contraste verificado en todo el paint
   custom; editor visual de paletas.
 - **Noticias**: soporte JSON Feed; caché offline de items; filtro por
