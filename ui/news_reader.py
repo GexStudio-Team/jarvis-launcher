@@ -32,7 +32,7 @@ import html as _html
 import os
 import webbrowser
 
-from PyQt6.QtCore import QUrl, Qt, pyqtSignal
+from PyQt6.QtCore import QTimer, QUrl, Qt, pyqtSignal
 from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import (
     QFrame,
@@ -310,16 +310,33 @@ class MiniBrowser(QWidget):
                 self._stack.setCurrentWidget(self._engine)
             else:
                 self._engine.setUrl(QUrl(url))
+            # 3) Red de seguridad (fix v2.0.3 / G-006): si la carga oculta no
+            #    termina (o tarda), el embebido se muestra igualmente; Chromium
+            #    reanuda la navegacion al volverse visible.
+            QTimer.singleShot(2500, lambda s=seq: self._force_show_web(s))
         else:
             self._fallback.setHtml(fallback_html)
             self._stack.setCurrentWidget(self._fallback)
             self._fallback.verticalScrollBar().setValue(0)
 
+    def _force_show_web(self, seq: int) -> None:
+        """Muestra el mini navegador si la pagina real aun no salto (G-006)."""
+        if self._engine is None or self._pending_cb is None:
+            return
+        if (
+            seq == self._pending_cb[0]
+            and self._stack.currentWidget() is self._fallback
+        ):
+            self._stack.setCurrentWidget(self._engine)
+
     def _on_web_finished(self, ok: bool) -> None:
-        """Pagina real lista -> la muestra sobre el resumen (si sigue actual)."""
+        """Pagina real lista -> la muestra sobre el resumen (si sigue actual).
+
+        Se muestra aunque la carga haya fallado (ok=False): el motor dibuja su
+        pagina de error y el embebido nunca "desaparece" (fix v2.0.3 / G-006).
+        """
         cb = self._pending_cb
-        self._pending_cb = None
-        if not ok or cb is None or self._engine is None:
+        if cb is None or self._engine is None:
             return
         if self._stack.currentWidget() is self._fallback:
             self._stack.setCurrentWidget(self._engine)

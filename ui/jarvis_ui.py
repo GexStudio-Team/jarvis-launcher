@@ -60,6 +60,7 @@ from core.state import StateManager
 from core.themes import ThemeManager
 from core.settings import SettingsManager
 from core.tray import Tray
+from core.version import get_app_version
 from ui.mode_card import ModeCard
 from ui.news_panel import NewsPanel
 from ui.news_reader import NewsReaderView
@@ -606,7 +607,7 @@ class JarvisUI(QWidget):
         self._status_bar.addWidget(self._status_label)
         self._status_bar.addStretch()
         version_label = QLabel(
-            f"v{self._config.get('version', '1.0.0')}", self._center_widget
+            f"v{get_app_version()}", self._center_widget
         )
         version_label.setStyleSheet(
             "background: transparent; border: none; color: rgba(255,255,255,50); font-size: 10px;"

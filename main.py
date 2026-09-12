@@ -21,6 +21,7 @@ from core.config import ConfigManager
 from core.github_link import detect_gh_identity
 from core.launcher import AppLauncher
 from core.settings import SettingsManager
+from core.version import get_app_version
 from ui.jarvis_ui import JarvisUI
 
 # -----------------------------------------------------------------------
@@ -130,7 +131,7 @@ def main() -> int:
     )
     app = QApplication(sys.argv)
     app.setApplicationName("J.A.R.V.I.S. Launcher")
-    app.setApplicationVersion(config._config.get("version", "1.0.0"))
+    app.setApplicationVersion(get_app_version())
 
     # Estilo global
     app.setStyleSheet(

@@ -76,6 +76,10 @@
 - [x] v2.0.2: **Perf G-004** — descarga de fuentes en paralelo (`ThreadPoolExecutor`, máx 6 workers); 12 fuentes ≈ 2.1 s (antes ~suma)
 - [x] v2.0.2: **Perf G-005** — cambio de artículo instantáneo en el lector (resumen local ~1 ms + página real en segundo plano con guard por secuencia)
 - [x] v2.0.2: perf tests offscreen OK (G-004, G-005, regresión lector) + smoke 3/3 + reader 11/11 + engine warm 5/5
+- [x] v2.0.3: **Bug G-006** — embebido vuelve a cargar siempre (resumen + web con red de seguridad `QTimer 2.5s` + `_on_web_finished` muestra aunque falle)
+- [x] v2.0.3: **Bug G-007** — versión automática en la barra de estado: `core/version.py` (`get_app_version` lee tag git al arrancar); UI, main y config sincronizados a 2.0.2
+- [x] v2.0.3: **docs/RELEASE.md** — metodología de release: branding (GexStudio Team → Comunidad GexClub), saludo por franja horaria de Bogotá (`greeting_for_bogota`), versión por tag
+- [x] v2.0.3: branding corregido en notas del release v2.0.2 de GitHub (`gh release edit`)
 
 ## En progreso
 
@@ -121,6 +125,11 @@
 - [ ] **Cambio de artículo rápido (G-005)**: abrir una noticia, navegar con
       ←/→ y confirmar que el resumen aparece al instante y la página web
       salta sola al cargar (sin pantalla en blanco)
+- [ ] **Embebido siempre visible (G-006)**: abrir una noticia, esperar ~3 s y
+      confirmar que el navegador embebido SÍ aparece (resumen + web; el motor
+      no se queda dormido oculto); también con sitios lentos o que fallan
+- [ ] **Versión al iniciar (G-007)**: la barra inferior debe mostrar
+      **v2.0.3** (o la release vigente) sin editar nada a mano
 
 ---
 _Historial de release: v2.0.0 (modo foco + lector), v1.4.0 (temas/noticias/settings),
