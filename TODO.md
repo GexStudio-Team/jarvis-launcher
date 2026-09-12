@@ -80,6 +80,8 @@
 - [x] v2.0.3: **Bug G-007** — versión automática en la barra de estado: `core/version.py` (`get_app_version` lee tag git al arrancar); UI, main y config sincronizados a 2.0.2
 - [x] v2.0.3: **docs/RELEASE.md** — metodología de release: branding (GexStudio Team → Comunidad GexClub), saludo por franja horaria de Bogotá (`greeting_for_bogota`), versión por tag
 - [x] v2.0.3: branding corregido en notas del release v2.0.2 de GitHub (`gh release edit`)
+- [x] v2.0.3: releases v2.0.0/v2.0.1/v2.0.2 con notas **UTF-8 sin BOM** (mojibake reparado en GitHub) + regla en `docs/RELEASE.md`
+- [x] v2.0.3: release publicada (Latest) + `git fetch --tags` → versión automática muestra **2.0.3**
 
 ## En progreso
 
