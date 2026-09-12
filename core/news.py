@@ -15,6 +15,7 @@ import logging
 import time
 import urllib.request
 import xml.etree.ElementTree as ET
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Callable
@@ -242,24 +243,38 @@ class NewsService:
         """
         Descarga y combina varias fuentes (["name", "url"]).
 
+        Descarga concurrente (ThreadPoolExecutor, max 6 workers): el tiempo
+        total pasa de la SUMA de latencias a ~el MAXIMO (perf v2.0.2, G-004).
+
         Returns
         -------
         Items unicos por guid, ordenados de mas reciente a mas antiguo.
         """
-        all_items: list[NewsItem] = []
-        seen: set[str] = set()
-
+        # Fuentes unicas por URL (las duplicadas se descargan una sola vez)
+        jobs: dict[str, str] = {}
         for source in sources:
-            name = source.get("name", "Noticias")
             url = source.get("url", "")
-            if not url:
-                continue
+            if url and url not in jobs:
+                jobs[url] = source.get("name", "Noticias")
+
+        def _job(url_name: tuple[str, str]) -> list[NewsItem]:
+            url, name = url_name
             try:
-                items = self._fetch_single(url, name)
+                return self._fetch_single(url, name)
             except Exception as exc:  # noqa: BLE001 - red no confiable
                 logger.warning("Feed [%s] fallo: %s", name, exc)
-                items = []
+                return []
 
+        if jobs:
+            workers = min(6, len(jobs))
+            with ThreadPoolExecutor(max_workers=workers) as pool:
+                grouped: list[list[NewsItem]] = list(pool.map(_job, jobs.items()))
+        else:
+            grouped = []
+
+        all_items: list[NewsItem] = []
+        seen: set[str] = set()
+        for items in grouped:
             for item in items:
                 key = item.guid or item.url
                 if key in seen:

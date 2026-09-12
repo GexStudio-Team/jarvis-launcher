@@ -96,10 +96,39 @@ sin consentimiento explícito del clic).
   (constructor + settings + bloqueador por unidad), integración con `JarvisUI`,
   boot y render — **0 errores** en offscreen.
 
+## Actualización v2.0.2 (G-004 / G-005)
+
+La comunidad reportó que "las noticias cargan muy lento" y que "cambiar de
+una a otra se demora en renderizar". Se extiende la optimización en dos frentes:
+
+1. **Descarga de fuentes en paralelo (G-004)**: `NewsService.fetch_sources`
+   usa `ThreadPoolExecutor` (máx. 6 workers) en lugar del bucle secuencial.
+   Urllib libera el GIL durante el I/O de red, por lo que el paralelismo es
+   real: el tiempo total pasa de `Σ latencias` a `≈ máx`. Medido en offscreen:
+   12 fuentes que fallan rápido ≈ **2.1 s**. Fuentes duplicadas por URL se
+   descargan una sola vez; el caché de 600 s por fuente se conserva bajo
+   `ThreadPoolExecutor` (acceso atómico de dict bajo GIL).
+2. **Cambio de artículo instantáneo (G-005)** — patrón *resumen primero,
+   web después*: `MiniBrowser.show_article()` ya no bloquea el render esperando
+   la navegación real; muestra de inmediato el resumen del feed (HTML local
+   con tipografía del tema, ~1 ms) y dispara `setUrl()` en segundo plano.
+   Un `loadFinished` propio (`_on_web_finished`) con guard por secuencia
+   (`_load_seq`) cambia al `QWebEngineView` cuando la página termina — si el
+   usuario cambió de artículo mientras cargaba, la web de la carga antigua no
+   se muestra. Si el artículo ya estaba cargado (misma URL), se muestra la web
+   directa sin re-descargar.
+
+Consecuencias v2.0.2: la primera carga del panel es ~la más lenta de las
+fuentes (no la suma); navegar entre artículos es instantáneo a la percepción
+y la web completa llega sola por detrás. Estabilidad: `ThreadPoolExecutor`
+entra como en por contexto (espera a todos los hilos al salir), sin pérdida
+de items y con el mismo dedup/orden por fecha.
+
 ## Referencias
 
 - [ADR-008](./ADR-008-webengine.md) (mini navegador, decisión original)
 - [ADR-001](./ADR-001-quitar-qgraphicseffect.md) (sin `QGraphicsEffect`; fades
   con `windowOpacity` nativa)
 - [ADR-010](./ADR-010-feedback-sin-sonido.md) (eliminación de los beeps)
-- `ui/news_reader.py`, `ui/jarvis_ui.py`
+- [ADR-011](./ADR-011-modo-foco-total.md) (modo foco total v2.0.2)
+- `ui/news_reader.py`, `ui/jarvis_ui.py`, `core/news.py`

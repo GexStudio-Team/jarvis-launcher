@@ -167,6 +167,11 @@ flowchart TD
   `time_ago()` para la UI.
 - `PRESET_SOURCES`: 10 fuentes predefinidas; soporta URL propia (validación
   con lectura real del feed).
+- **Descarga concurrente (v2.0.2 / G-004)**: `fetch_sources` ejecuta las
+  fuentes en paralelo con `ThreadPoolExecutor` (máx. 6 workers, urllib
+  libera el GIL en I/O)→ el tiempo total ≈ el *máximo* de latencias, no la
+  *suma*; fuentes duplicadas por URL se descargan una sola vez y el caché de
+  600 s se conserva.
 - Ver también: [ADR-005](./ADR-005-panel-noticias-rss.md).
 
 ### `core/config.py` — `ConfigManager`
@@ -282,6 +287,11 @@ flowchart TD
   CSS y contenido completo) en Chromium; sin la dependencia, muestra el HTML
   de lectura larga v2 (lead con capitular, pull-quote). El módulo se importa
   en el constructor (try/except, lazy).
+- **Cambio de artículo instantáneo (v2.0.2 / G-005)**: `show_article` muestra
+  **al instante** el resumen del feed (HTML local del tema) y carga la URL
+  real en segundo plano; `_on_web_finished` (guard por `_load_seq`) salta a la
+  web cuando termina. Si el artículo ya estaba cargado, se reutiliza sin
+  re-descargar.
 - **Optimizaciones de rendimiento (ADR-009)** — el primer clic "frío"
   (arranque de Chromium) se elimina:
   - El view **no navega en el constructor**: los procesos del motor arrancan

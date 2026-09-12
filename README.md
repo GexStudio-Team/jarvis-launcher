@@ -43,11 +43,14 @@ Interfaz tipo JARVIS (Iron Man) que se ejecuta al iniciar Windows y permite lanz
   bandeja configurables
 - **Lector de noticias con mini navegador**: haz clic en cualquier noticia del
   panel y se abre a pantalla completa un **navegador embebido con el artículo
-  real** (imágenes, videos y todo el contenido del sitio). Lista lateral para
-  cambiar de artículo al instante, botón **⟳** para recargar y
-  **ABRIR ORIGINAL ↗** para verlo en tu navegador habitual.
+  real** (imágenes, videos y todo el contenido del sitio). Cambia de artículo
+  **al instante** (el resumen aparece de inmediato y la página completa salta
+  cuando termina de cargar), botón **⟳** para recargar y **ABRIR ORIGINAL ↗**
+  para verlo en tu navegador habitual.
   *El panel lateral se mantiene limpio: fuente, hora y título de cada noticia
   (sin textos apilados); lo completo se lee en el lector.*
+- **Noticias rápidas**: las fuentes se descargan en paralelo (solo esperas a
+  la más lenta) y la primera carga del panel llega en segundos
 
 ## Requisitos
 

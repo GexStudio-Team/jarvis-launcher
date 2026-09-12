@@ -73,6 +73,9 @@
 - [x] v2.0.2: **Bug G-003** — Ajustes -> Aplicar re-aplica panel y refresca noticias en vivo (`refresh_news()`)
 - [x] v2.0.2: smoke test offscreen 3/3 (G-001, G-002, G-003) + compileall OK
 - [x] v2.0.2: docs — CHANGELOG [2.0.2] + mensaje GexStudio Team a la comunidad, ADR-011, Arquitectura, TODO
+- [x] v2.0.2: **Perf G-004** — descarga de fuentes en paralelo (`ThreadPoolExecutor`, máx 6 workers); 12 fuentes ≈ 2.1 s (antes ~suma)
+- [x] v2.0.2: **Perf G-005** — cambio de artículo instantáneo en el lector (resumen local ~1 ms + página real en segundo plano con guard por secuencia)
+- [x] v2.0.2: perf tests offscreen OK (G-004, G-005, regresión lector) + smoke 3/3 + reader 11/11 + engine warm 5/5
 
 ## En progreso
 
@@ -113,6 +116,11 @@
 - [ ] **Modo foco total**: al abrir J.A.R.V.I.S. debe tapar toda la vista
       (sin "nueva ventana flotante"); probar también en monitor de
       resolución baja si se tiene acceso
+- [ ] **Rendimiento del panel**: con varias fuentes conectadas, la primera
+      carga debe llegar en ~1–3 s (descarga en paralelo, no en fila)
+- [ ] **Cambio de artículo rápido (G-005)**: abrir una noticia, navegar con
+      ←/→ y confirmar que el resumen aparece al instante y la página web
+      salta sola al cargar (sin pantalla en blanco)
 
 ---
 _Historial de release: v2.0.0 (modo foco + lector), v1.4.0 (temas/noticias/settings),
