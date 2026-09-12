@@ -36,7 +36,6 @@ from PyQt6.QtWidgets import (
     QCheckBox,
 )
 
-from core.feedback import play_click
 from core.github_link import detect_gh_identity, verify_username
 from core.news import NewsService, PRESET_SOURCES
 from core.themes import ThemeManager
@@ -307,7 +306,7 @@ class ConnectDialog(QDialog):
     # ------------------------------------------------------------------
 
     def _connect(self, name: str, url: str) -> None:
-        play_click()
+        
         self._settings.news_sources = [{"name": name, "url": url}]
         self._settings.news_enabled = True
         self._status.setText(f"Conectado a {name}")
@@ -324,7 +323,7 @@ class ConnectDialog(QDialog):
             self._status.setText("Escribe una URL RSS/Atom primero.")
             return
 
-        play_click()
+        
         self._connect_btn.setEnabled(False)
         self._connect_btn.setText("VERIFICANDO...")
         self._status.setText("Comprobando enlace...")
@@ -474,7 +473,7 @@ class GithubDialog(QDialog):
         if not username:
             self._status.setText("Escribe tu username de GitHub primero.")
             return
-        play_click()
+        
         self._verify_btn.setEnabled(False)
         self._verify_btn.setText("VERIFICANDO...")
         self._status.setText("Consultando perfil en GitHub...")
@@ -514,7 +513,7 @@ class GithubDialog(QDialog):
         login, name = ident
         self._settings.github_username = login
         self._settings.github_name = name or login
-        play_click()
+        
         QMessageBox.information(
             self,
             "Cuenta vinculada",
@@ -875,7 +874,7 @@ class SettingsDialog(QDialog):
     # ------------------------------------------------------------------
 
     def _on_theme_selected(self, theme_id: str) -> None:
-        play_click()
+        
         self._theme.set_theme(theme_id)
         self._apply_theme()
         for tid, swatch in self._swatches.items():
@@ -915,7 +914,7 @@ class SettingsDialog(QDialog):
     # ------------------------------------------------------------------
 
     def _on_startup_toggle(self) -> None:
-        play_click()
+        
         parent_ui = self.parent()
         if parent_ui is not None and hasattr(parent_ui, "toggle_startup"):
             parent_ui.toggle_startup()
@@ -925,7 +924,7 @@ class SettingsDialog(QDialog):
     # ------------------------------------------------------------------
 
     def _apply_and_close(self) -> None:
-        play_click()
+        
         # Tema
         self._settings.theme = self._theme.theme_id
         # Bandeja

@@ -6,6 +6,37 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/).
 
 ---
 
+## [Unreleased]
+
+### Added
+- **Optimización del lector de noticias (ADR-009)** — se elimina el *cold
+  start* de Chromium que hacía lento el primer clic:
+  - **Pre-warm del motor**: `NewsReaderView` se instancia oculto a los ~900 ms
+    del boot (`QTimer.singleShot`); el primer clic solo navega a la URL real
+    del artículo en lugar de arrancar Chrome embebido.
+  - **Perfil persistente con caché HTTP en disco** (100 MB) en
+    `%APPDATA%\JarvisLauncher\WebEngine`: re-visitas y assets repetidos cargan
+    desde caché.
+  - **Bloqueo de rastreadores/publicidad** (`_TrackerBlocker`, 17 dominios de
+    ads/analytics): menos peticiones y bytes por página; no toca imágenes/CSS
+    del sitio.
+  - Settings de red: `DnsPrefetchEnabled` habilitado y
+    `PlaybackRequiresUserGesture` (sin autoplay de video → menos datos).
+  - Fade de apertura del lector reducido de 220 ms a **110 ms** (respuesta
+    visual casi instantánea).
+  - `JARVIS_DISABLE_WEBENGINE=1`: modo para CI headless que prueba el lector
+    completo por el fallback de texto (el renderer de Chromium no navega sin
+    GPU).
+
+### Removed
+- **`core/feedback.py` y sus 15 llamadas (ADR-010)**: se eliminan los sonidos
+  `winsound.Beep` (click/éxito/error) de cards, panel, lector y Ajustes. El
+  feedback pasa a ser **100 % visual** (hover, resaltado, sweep, barra de
+  estado y notificaciones del sistema); cada clic ya no crea un hilo daemon de
+  audio y la UI responde sin ruido.
+
+---
+
 ## [2.0.0] - 2026-09-11 (America/Bogota)
 
 ### Added
