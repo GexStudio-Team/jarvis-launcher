@@ -320,7 +320,14 @@ class JarvisUI(QWidget):
         )
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, False)
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, False)
-        self.setMinimumSize(1200, 720)
+        _screen = QApplication.primaryScreen()
+        if _screen is not None:
+            _g = _screen.geometry()
+            # El minimo nunca debe exceder la pantalla (fullscreen en
+            # monitores pequenos, fix v2.0.2 / Bug G-002)
+            self.setMinimumSize(min(1200, _g.width()), min(720, _g.height()))
+        else:  # pragma: no cover
+            self.setMinimumSize(1200, 720)
         self._center_on_screen()
 
         # Fondo animado
@@ -404,15 +411,15 @@ class JarvisUI(QWidget):
     # ------------------------------------------------------------------
 
     def _center_on_screen(self) -> None:
+        """Expande la ventana a toda la pantalla principal (modo foco total).
+
+        La ventana es frameless y siempre al frente; usar la geometria completa
+        del monitor hace que J.A.R.V.I.S. tape toda la vista (ADR-011).
+        """
         screen = QApplication.primaryScreen()
         if screen is None:
             return
-        geo = screen.availableGeometry()
-        w = min(1480, geo.width() - 60)
-        h = min(920, geo.height() - 60)
-        x = geo.x() + (geo.width() - w) // 2
-        y = geo.y() + (geo.height() - h) // 2
-        self.setGeometry(x, y, w, h)
+        self.setGeometry(screen.geometry())
 
     def _apply_theme_particles(self) -> None:
         w, h = self.width(), self.height()
@@ -633,6 +640,16 @@ class JarvisUI(QWidget):
         self._root_layout.insertWidget(1, self._center_widget, 1)
         # Forzar medida inicial
         self._news_panel.set_initial_width()
+
+    def apply_news_panel(self) -> None:
+        """Aplica posicion/visibilidad del panel (API publica, usado al cambiar
+        la fuente o al guardar los ajustes desde el dialogo).
+
+        Llamable desde el dialogo de ajustes (hasattr) y desde el flujo de
+        conexion de noticias. Fix v2.0.2: este metodo no existia y el flujo
+        de conexion crasheaba con AttributeError (Bug G-001).
+        """
+        self._apply_news_panel_position()
 
     def _on_news_width_changed(self, value: int) -> None:
         self._settings.news_width = value

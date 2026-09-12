@@ -4,7 +4,7 @@ Interfaz tipo JARVIS (Iron Man) que se ejecuta al iniciar Windows y permite lanz
 
 ## Caracteristicas
 
-- Interfaz fullscreen con efectos HUD: anillos rotantes, particulas flotantes, linea de escaneo
+- Interfaz fullscreen que **tapa toda la vista** (modo foco) con efectos HUD: anillos rotantes, particulas flotantes, linea de escaneo
 - Pantalla de boot animada tipo arranque de sistema (barra de progreso)
 - Greeting con efecto typewriter
 - 3 modos predefinidos: Gaming, Trabajo, Estudio (personalizables via `config.json`)
@@ -27,9 +27,9 @@ Interfaz tipo JARVIS (Iron Man) que se ejecuta al iniciar Windows y permite lanz
   propia URL RSS/Atom (se valida antes de conectar)
 - **Temas de color**: 8 paletas (obsidiana, nocturno, crimson, esmeralda,
   matriz, violeta, ambar, luz, nieve) selectables desde la rueda de ajustes ⚙
-- **Siempre al frente + bandeja del sistema**: el launcher queda encima de todo;
-  al pulsar ✕ se oculta a la bandeja y sigue activo (doble clic en el icono
-  para volverlo a abrir)
+- **Siempre al frente + bandeja del sistema**: el launcher queda encima de todo
+  y ocupa toda la pantalla; al pulsar ✕ se oculta a la bandeja y sigue activo
+  (doble clic en el icono para volverlo a abrir)
 - **Atajo global `Ctrl+Shift+Espacio`**: convoca u oculta el launcher desde
   cualquier aplicación
 - **Saludo dinámico**: "Buenos días/tardes/noches" según la hora, con adjetivo

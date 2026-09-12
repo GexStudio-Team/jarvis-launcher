@@ -942,6 +942,10 @@ class SettingsDialog(QDialog):
                 parent_ui.apply_theme()
             if hasattr(parent_ui, "apply_news_panel"):
                 parent_ui.apply_news_panel()
+            if hasattr(parent_ui, "refresh_news"):
+                # Fix v2.0.2 (Bug G-003): refresca las noticias en vivo al
+                # aplicar ajustes - antes el panel solo cambiaba al reiniciar
+                parent_ui.refresh_news()
         self.accept()
 
     # ------------------------------------------------------------------

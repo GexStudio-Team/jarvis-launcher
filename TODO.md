@@ -64,11 +64,19 @@
 - [x] v2: **mini navegador embebido** — `PyQt6-WebEngine` instalado (6.11); `MiniBrowser` con `QWebEngineView` carga la URL real del articulo (imagenes y todo); fallback a QTextBrowser si no esta instalado; `AA_ShareOpenGLContexts` en main
 - [x] v2: **panel de noticias des saturado** — sin preview apilado (fuente+hora+titulo), altura 88px, spacing 10, 12 items; lo completo se lee en el lector
 - [x] v2: docs ADR-008 (webengine), Arquitectura y README actualizados (requisitos + lector)
+- [x] v2.0.0: PR #2 mergeado a main (6d80316) y release publicada (tag v2.0.0)
+- [x] v2.0.1: pre-warm Chromium + caché disco + bloqueo rastreadores + fade 110 ms (ADR-009); `JARVIS_DISABLE_WEBENGINE` para CI headless
+- [x] v2.0.1: feedback sonoro eliminado — `core/feedback.py` + 15 llamadas (ADR-010)
+- [x] v2.0.1: 5 suites offscreen 0 errores; PR #3 mergeado (e5735e4) y release v2.0.1 (tag v2.0.1)
+- [x] v2.0.2: **Bug G-001** — método público `apply_news_panel()` (antes `AttributeError` cerraba la app al cambiar fuente)
+- [x] v2.0.2: **Bug G-002** — `_center_on_screen()` ahora tapa toda la pantalla (modo foco total, ADR-011) y mínimo relativo al monitor
+- [x] v2.0.2: **Bug G-003** — Ajustes -> Aplicar re-aplica panel y refresca noticias en vivo (`refresh_news()`)
+- [x] v2.0.2: smoke test offscreen 3/3 (G-001, G-002, G-003) + compileall OK
+- [x] v2.0.2: docs — CHANGELOG [2.0.2] + mensaje GexStudio Team a la comunidad, ADR-011, Arquitectura, TODO
 
 ## En progreso
 
-- [ ] Merge de `feat/news-reader` a `main` vía PR (propuesta entregada, pendiente de aprobacion y creacion)
-- [ ] Release GitHub v2.0.0 + tag (pendiente de la creacion del PR)
+- [ ] (vacío — sin tareas activas)
 
 ## Pendiente
 
@@ -87,7 +95,7 @@
 - [ ] Prueba de pantalla completa real y posicion en monitores multiples
 - [ ] Revisar uso de CPU del core/beam en pantallas grandes
 
-## Validación en máquina real (ADR-009)
+## Validación en máquina real (ADR-009 / ADR-011)
 
 - [ ] **Primer clic en noticia**: abrir el lector y confirmar que carga el
       artículo casi al instante (sin el "arranque" de Chromium del clic)
@@ -98,6 +106,13 @@
       ads/analytics quedan bloqueados)
 - [ ] Confirmar que la UI no emite ningún sonido al hacer clic (feedback
       visual únicamente)
+- [ ] **Cambiar de fuente de noticias (⚙ → Noticias → CONECTAR)**: la app NO
+      debe cerrarse y el panel debe mostrar la nueva fuente en el momento
+- [ ] **Ajustes → Aplicar**: cambiar posición/tema y confirmar que el panel
+      y la interfaz cambian al instante (sin reiniciar)
+- [ ] **Modo foco total**: al abrir J.A.R.V.I.S. debe tapar toda la vista
+      (sin "nueva ventana flotante"); probar también en monitor de
+      resolución baja si se tiene acceso
 
 ---
 _Historial de release: v2.0.0 (modo foco + lector), v1.4.0 (temas/noticias/settings),
