@@ -6,7 +6,7 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/).
 
 ---
 
-## [Unreleased]
+## [2.0.1] - 2026-09-11 (America/Bogota)
 
 ### Added
 - **Optimización del lector de noticias (ADR-009)** — se elimina el *cold
@@ -173,21 +173,6 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/).
 
 ---
 
-## [Unreleased]
-
-### Added
-- Carpeta `docs/` como fuente principal de documentación técnica:
-  - `docs/Arquitectura.md`: componentes, módulos, flujo de información, operaciones y deuda técnica
-  - `docs/ADR-001-quitar-qgraphicseffect.md`: decisión de eliminar `QGraphicsEffect` y pintar efectos manualmente (v1.2.0)
-  - `docs/ADR-002-resolucion-apps-por-nombre.md`: decisión de resolución de rutas por nombre corto (v1.2.0)
-  - `docs/ADR-003-comando-global-jarvis.md`: decisión del comando global `jarvis` (v1.3.0)
-- Enlace a `docs/` desde el README raíz (documentación técnica separada de la de usuario)
-
-### Changed
-- README raíz ahora se declara explícitamente como documentación de usuario final
-
----
-
 ## [1.3.0] - 2026-09-10 (America/Bogota)
 
 ### Added
@@ -199,6 +184,11 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/).
 ### Fixed
 - El comando resuelve correctamente desde PowerShell y CMD (verificado con
   reconstruccion del PATH desde el registro y lanzamiento real del proceso)
+
+### Docs (histórico absorbido)
+- Carpeta `docs/` creada como fuente principal de documentación técnica
+  (`Arquitectura.md` + ADR-001/002/003) y enlace desde el README raíz
+- README se declara explícitamente como documentación de usuario final
 
 ---
 
