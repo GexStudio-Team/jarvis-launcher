@@ -21,7 +21,7 @@ saluden con coherencia horaria:
 import os
 import subprocess
 
-__version__ = "2.0.2"
+__version__ = "2.0.3"
 
 # Windows: evita abrir una ventana de consola al invocar git.
 _CREATE_NO_WINDOW = 0x08000000

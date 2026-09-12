@@ -15,7 +15,7 @@ class ConfigManager:
 
     DEFAULT_CONFIG = {
         "app_name": "J.A.R.V.I.S. Launcher",
-        "version": "2.0.2",
+        "version": "2.0.3",
         "greeting": "Buenos dias, senpai. Selecciona tu modo de operacion:",
         "modes": {
             "gaming": {
