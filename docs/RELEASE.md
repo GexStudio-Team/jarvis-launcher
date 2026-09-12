@@ -83,6 +83,11 @@ agente: **siempre consultar la hora de Bogotá antes de escribir el mensaje**.
 6. **Release GitHub**:
    `gh release create vX.Y.Z --title "..." --notes-file notas.md --target main`
    con las notas en `temp/opencode/release_vX_Y_Z_notes.md` (reusables).
+   **Regla de encoding obligatoria**: el archivo de notas debe ser **UTF-8
+   sin BOM**. Escribirlo SIEMPRE con la herramienta de edición de archivos
+   (Write), nunca con `Set-Content`/`Out-File` de PowerShell 5.1 (añaden BOM
+   y, al re-leer con codificación por defecto, corrompen los caracteres
+   multibyte: 🎙️ → �YZT�� y acentos → mojibake en GitHub).
 7. **Sincronizar versión**: `core/version.py.__version__` + `config.json`
    `version` + `DEFAULT_CONFIG` (core/config.py).
 8. **Verificar repos**: `git log --oneline -3`, `gh release list`,

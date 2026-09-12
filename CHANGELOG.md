@@ -34,6 +34,11 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/).
   horaria de América/Bogotá (`core/version.greeting_for_bogota`) y flujo
   completo tag → CHANGELOG → PR → release. El mensaje de comunidad saluda a la
   **comunidad GexClub** (corrección de branding).
+- **Encoding UTF-8 sin BOM en release notes**: re-subidas las notas de
+  v2.0.0/v2.0.1 y reconstruidas las de v2.0.2 (alcanzada por mojibake al
+  reescribir con PowerShell 5.1: emojis y acentos no se renderizaban en
+  GitHub). `docs/RELEASE.md` fija la regla: notas siempre con herramienta de
+  archivo UTF-8 sin BOM.
 
 ---
 
