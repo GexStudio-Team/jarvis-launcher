@@ -6,50 +6,6 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/).
 
 ---
 
-## [Unreleased]
-
-### Added
-- `ui/news_reader.py` (`NewsReaderView` + `MiniBrowser` + `MiniNewsItem`):
-  **lector de noticias a pantalla completa** (spec v2 puntos 3 y 4) que se
-  abre al hacer clic en una noticia del panel:
-  - **Mini navegador embebido (Chromium)**: `QWebEngineView` carga la **URL
-    real del artículo** dentro del launcher, mostrando imágenes, CSS y el
-    contenido completo del sitio; botones **⟳** (recargar) y
-    **ABRIR ORIGINAL ↗** (navegador externo) en el encabezado
-  - **Split-pane redimensionable** (`QSplitter`, estilo `QSplitter::handle`)
-    con lista compacta a la izquierda (título + fuente/hora, artículo actual
-    resaltado) y el mini navegador a la derecha
-  - **Fallback elegante sin la dependencia**: si `PyQt6-WebEngine` no está
-    instalado, el lector muestra el resumen del feed con la tipografía de
-    lectura larga de la v2 (lead con capitular, pull-quote en cursiva) en un
-    `QTextBrowser`; la app nunca deja de funcionar
-  - Navegación por teclado: `←`/`→` cambian de artículo y `Escape` vuelve al
-    launcher; feedback de carga en el encabezado ("Cargando artículo…")
-  - `main.py`: `QApplication.setAttribute(AA_ShareOpenGLContexts, True)`
-    antes de crear la app (requisito del WebEngine)
-
-### Changed
-- `ui/news_panel.py`: **panel des saturado** — se elimina el preview apilado
-  (cada noticia queda con fuente + hora + título, sin texto encima de otro),
-  altura de tarjeta reducida a 88 px, más respiro entre items (spacing 10) y
-  lista limitada a 12 noticias; el clic emite `readerRequested(items, index)`
-  y abre el lector (el enlace original queda dentro del lector)
-- `ui/jarvis_ui.py`: integra `NewsReaderView` bajo demanda
-  (`_open_reader` / `_close_reader`), conecta `readerRequested`, prioriza los
-  atajos del lector en `keyPressEvent` y aplica el tema vivo al abrir
-
-### Dependencies
-- `requirements.txt`: añadido `PyQt6-WebEngine>=6.7` como dependencia
-  **opcional** (mini navegador del lector; el fallback de texto no la exige).
-  Instalada en el entorno: `PyQt6-WebEngine 6.11.0`
-
-### Docs
-- `docs/ADR-007-lector-noticias.md` actualizado y `docs/ADR-008-webengine.md`
-  (decisión del mini navegador: justificación de la dependencia y fallback);
-  `docs/Arquitectura.md`, `README.md` y `TODO.md` actualizados
-
----
-
 ## [2.0.0] - 2026-09-11 (America/Bogota)
 
 ### Added
@@ -103,6 +59,41 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/).
 ### Fixed
 - El launcher podía quedar detrás de otras ventanas al arrancar: ahora fuerza
   z-order y foco con `raise_()` + `activateWindow()`
+
+### Lector de noticias (spec v2 puntos 3 y 4)
+- `ui/news_reader.py` (`NewsReaderView` + `MiniBrowser` + `MiniNewsItem`):
+  **lector de noticias a pantalla completa** que se abre al hacer clic en una
+  noticia del panel:
+  - **Mini navegador embebido (Chromium)**: `QWebEngineView` carga la **URL
+    real del artículo** dentro del launcher, mostrando imágenes, CSS y el
+    contenido completo del sitio; botones **⟳** (recargar) y
+    **ABRIR ORIGINAL ↗** (navegador externo) en el encabezado
+  - **Split-pane redimensionable** (`QSplitter`) con lista compacta a la
+    izquierda (título + fuente/hora, artículo actual resaltado) y el mini
+    navegador a la derecha
+  - **Fallback elegante sin la dependencia**: si `PyQt6-WebEngine` no está
+    instalado, el lector muestra el resumen del feed con la tipografía de
+    lectura larga de la v2 (lead con capitular, pull-quote en cursiva) en un
+    `QTextBrowser`; la app nunca deja de funcionar
+  - Navegación por teclado: `←`/`→` cambian de artículo y `Escape` vuelve al
+    launcher; feedback de carga en el encabezado ("Cargando artículo…")
+- `main.py`: `QApplication.setAttribute(AA_ShareOpenGLContexts, True)` antes
+  de crear la app (requisito del WebEngine)
+- Panel des saturado: `ui/news_panel.py` elimina el preview apilado (cada
+  noticia queda con fuente + hora + título, sin texto encima de otro), altura
+  de tarjeta reducida a 88 px, más respiro entre items (spacing 10) y lista
+  limitada a 12 noticias; el clic emite `readerRequested(items, index)` y
+  abre el lector (el enlace original queda dentro del lector)
+- `ui/jarvis_ui.py`: integra `NewsReaderView` bajo demanda
+  (`_open_reader` / `_close_reader`), conecta `readerRequested`, prioriza los
+  atajos del lector en `keyPressEvent` y aplica el tema vivo al abrir
+- `requirements.txt`: añadido `PyQt6-WebEngine>=6.7` como dependencia
+  **opcional** (mini navegador del lector; el fallback de texto no la exige).
+  Instalada en el entorno: `PyQt6-WebEngine 6.11.0`
+- Docs: `docs/ADR-007-lector-noticias.md` actualizado y
+  `docs/ADR-008-webengine.md` (decisión del mini navegador: justificación de
+  la dependencia y fallback); `docs/Arquitectura.md`, `README.md` y
+  `TODO.md` actualizados
 
 ---
 
