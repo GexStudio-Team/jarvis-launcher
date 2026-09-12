@@ -6,6 +6,71 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/).
 
 ---
 
+## [2.0.3] - 2026-09-11 (America/Bogota)
+
+### Fixed
+- **Bug G-006 — el navegador embebido dejó de cargar el artículo**: el cambio
+  instantáneo (G-005) escondía el `QWebEngineView` tras el resumen del feed
+  para cargar "en segundo plano"; en varios entornos Chromium **no completa la
+  carga de un widget oculto**, así que el `loadFinished` nunca llegaba y el
+  lector se quedaba solo con el resumen. Ahora:
+  - `_on_web_finished` muestra la web **siempre** que termina su carga (aunque
+    `ok=False`: el motor dibuja su página de error y el embebido nunca
+    "desaparece"), y
+  - una red de seguridad (`QTimer.singleShot(2500, _force_show_web)`) muestra
+    el mini navegador si la página tarda (Chromium reanuda la navegación al
+    volverse visible). El resumen instantáneo se conserva mientras tanto.
+- **Bug G-007 — la barra de estado seguía mostrando v2.0.0**: la versión se
+  leía de `config.json`, que quedó sin sincronizar tras las releases. Nuevo
+  `core/version.py` como fuente única: al arrancar lee `git describe --tags`
+  (la versión salta **sola** con cada release) y, si no hay git (instalación
+  entregada), usa la constante `__version__` sincronizada al liberar. La UI,
+  `main.py` y el `DEFAULT_CONFIG` de `config.py` usan `get_app_version()`.
+
+### Added
+- **Metodología de release documentada** (`docs/RELEASE.md`): identidad de
+  marca (GexStudio Team = desarrolladores; **GexClub** = comunidad; J.A.R.V.I.S.
+  = proyecto de GexClub desarrollado por GexStudio Team), saludo por franja
+  horaria de América/Bogotá (`core/version.greeting_for_bogota`) y flujo
+  completo tag → CHANGELOG → PR → release. El mensaje de comunidad saluda a la
+  **comunidad GexClub** (corrección de branding).
+- **Encoding UTF-8 sin BOM en release notes**: re-subidas las notas de
+  v2.0.0/v2.0.1 y reconstruidas las de v2.0.2 (alcanzada por mojibake al
+  reescribir con PowerShell 5.1: emojis y acentos no se renderizaban en
+  GitHub). `docs/RELEASE.md` fija la regla: notas siempre con herramienta de
+  archivo UTF-8 sin BOM.
+
+---
+
+## 🎙️ GexStudio Team → Comunidad GexClub
+
+¡Buenas noches, comunidad GexClub! 🌙
+
+Hoy vinimos a contarles algo que quizá ya sospechaban y que nos duele
+admitir: **ibas a leer una noticia y el navegador embebido ya no aparecía**.
+Resulta que, en la versión anterior, dejamos el motor escondido mientras la
+página terminaba de cargar "por detrás"… y Chromium, en varios equipos, se
+queda dormido cuando no lo puedes ver. El embebido ya no se nos vuelve a
+perder: ahora la página salta siempre, con una red de seguridad que la
+muestra si se demora (y de paso, el resumen instantáneo que tanto les gustó
+se queda de cortesía mientras llega).
+
+Y la segunda: **la barrita de abajo seguía diciendo v2.0.0** cuando ustedes
+ya estaban en v2.0.2. No es que fuéramos lentos publicando — es que la
+versión se leía de un archivo que olvidamos actualizar. Ahora J.A.R.V.I.S.
+**se pregunta a sí mismo la versión desde el tag de la release**: cada vez
+que publicamos una nueva, el launcher la muestra sola. Prometido.
+
+De paso, afinamos nuestra casa: el mensaje de cada release ahora se escribe
+según la **hora real de Bogotá** y saluda a nuestra gente: la **comunidad
+GexClub**. Porque GexClub es el hogar, GexStudio Team es la familia que
+desarrolla, y J.A.R.V.I.S. es el hijo de esa casa.
+
+Con cariño, su equipo GexStudio Team. Que J.A.R.V.I.S. te acompañe en el
+modo foco, comunidad. 🖤
+
+---
+
 ## [2.0.2] - 2026-09-11 (America/Bogota)
 
 ### Fixed
@@ -45,9 +110,9 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/).
 
 ---
 
-## 🎙️ GexStudio Team — mensaje a la comunidad
+## 🎙️ GexStudio Team → Comunidad GexClub
 
-¡Buenas noches, comunidad GexStudio! 🌙
+¡Buenas noches, comunidad GexClub! 🌙
 
 Esta semana estuvimos de guardia con el launcher y, como siempre, ustedes
 fueron los primeros en avisar. Detectamos tres cosas que no nos dejaban
