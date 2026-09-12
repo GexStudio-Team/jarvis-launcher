@@ -8,7 +8,9 @@ Rediseno v2 (modo workspace):
     titulo destacado, preview de 2 lineas reservado bajo el titulo.
   - Estado vacio sin emojis grandes: mensaje sobrio + boton CONECTAR.
   - Panel lateral redimensionable arrastrando su borde; refresco automatico
-    cada 10 minutos y manual (boton); click en noticia -> navegador.
+    cada 10 minutos y manual (boton); click en noticia -> abre el lector de
+    articulos a pantalla completa (ui/news_reader.py), que mantiene el enlace
+    original ("Abrir original").
 
 Estructura
 ----------
@@ -25,7 +27,6 @@ segun ADR-001).
 from __future__ import annotations
 
 import threading
-import webbrowser
 from datetime import datetime
 
 from PyQt6.QtCore import (
@@ -58,11 +59,15 @@ from core.themes import ThemeManager
 
 
 class NewsItemWidget(QFrame):
-    """Una noticia individual con jerarquia limpia (fuente/titulo/preview)."""
+    """Una noticia individual limpia: meta (fuente+hora) y titulo.
+
+    Sin preview apilado: la informacion completa se ve en el lector
+    (news_reader.py con mini navegador), asi el panel respira.
+    """
 
     itemClicked = pyqtSignal(object)  # NewsItem
 
-    BASE_HEIGHT = 108
+    BASE_HEIGHT = 88
 
     def __init__(
         self,
@@ -86,8 +91,8 @@ class NewsItemWidget(QFrame):
 
     def _build_layout(self) -> None:
         lay = QVBoxLayout(self)
-        lay.setContentsMargins(12, 8, 12, 8)
-        lay.setSpacing(2)
+        lay.setContentsMargins(12, 10, 12, 10)
+        lay.setSpacing(6)
 
         # Meta: fuente + hora (dim, compacto, uppercase)
         meta = QHBoxLayout()
@@ -110,23 +115,10 @@ class NewsItemWidget(QFrame):
         self._title_label = QLabel(self.item.title, self)
         self._title_label.setWordWrap(True)
         self._title_label.setStyleSheet("background: transparent; border: none;")
-        self._title_label.setMaximumHeight(34)
+        self._title_label.setMaximumHeight(36)
         f = QFont("Segoe UI", 9, QFont.Weight.Bold)
         self._title_label.setFont(f)
         lay.addWidget(self._title_label)
-
-        # Preview (resumen del feed, 2 lineas, dim)
-        summary = (self.item.extra.get("summary") or "").strip()
-        if summary:
-            self._preview_label = QLabel(summary, self)
-            self._preview_label.setWordWrap(True)
-            self._preview_label.setMaximumHeight(28)
-            self._preview_label.setStyleSheet(
-                "background: transparent; border: none; font-size: 10px;"
-            )
-            fp = QFont("Segoe UI", 8)
-            self._preview_label.setFont(fp)
-            lay.addWidget(self._preview_label)
 
     # ------------------------------------------------------------------
     # Hover
@@ -261,7 +253,7 @@ class NewsItemWidget(QFrame):
             f"background: transparent; border: none; color: {title_color};"
         )
 
-        # Fuente / hora / preview
+        # Fuente / hora
         dim = them.text_dim
         self._source_label.setStyleSheet(
             f"background: transparent; border: none; color: {dim};"
@@ -269,15 +261,11 @@ class NewsItemWidget(QFrame):
         self._time_label.setStyleSheet(
             f"background: transparent; border: none; color: {dim};"
         )
-        if hasattr(self, "_preview_label"):
-            self._preview_label.setStyleSheet(
-                f"background: transparent; border: none; color: {them.text_dim};"
-            )
         super().paintEvent(event)
         p.end()
 
     # ------------------------------------------------------------------
-    # Click -> abrir en navegador
+    # Click -> emitir item (el launcher abre el lector de articulos)
     # ------------------------------------------------------------------
 
     def mousePressEvent(self, event) -> None:
@@ -379,10 +367,13 @@ class NewsPanel(QFrame):
     -------
     configureRequested : pide abrir el dialogo de conexion de fuentes.
     widthChanged : al redimensionar por borde (avisa al layout padre).
+    readerRequested : (list[NewsItem], int) al pulsar una noticia -> abre el
+        lector de articulos (news_reader.py) en lugar del navegador directo.
     """
 
     configureRequested = pyqtSignal()
     widthChanged = pyqtSignal(int)
+    readerRequested = pyqtSignal(object, int)   # (items, index)
     _itemsFetched = pyqtSignal(object)   # list[NewsItem] desde hilo
 
     RESIZE_HANDLE = 6  # px del borde arrastrable
@@ -469,7 +460,7 @@ class NewsPanel(QFrame):
         self._list_container.setStyleSheet("background: transparent;")
         self._list_layout = QVBoxLayout(self._list_container)
         self._list_layout.setContentsMargins(0, 0, 4, 0)
-        self._list_layout.setSpacing(8)
+        self._list_layout.setSpacing(10)
         self._list_layout.addStretch()
         self._scroll_area.setWidget(self._list_container)
         outer.addWidget(self._scroll_area, 1)
@@ -671,11 +662,13 @@ class NewsPanel(QFrame):
                 w.deleteLater()
 
         # Insertar nuevos: top-down con entrada escalonada
-        for idx, item in enumerate(items[:20]):
+        self._current_items: list[NewsItem] = []
+        for idx, item in enumerate(items[:12]):
             w = NewsItemWidget(item, self._theme, self._list_container)
             w.itemClicked.connect(self._open_item)
+            self._current_items.append(item)
             self._list_layout.insertWidget(idx, w)
-            w.play_entrance(delay_ms=min(idx * 40, 800), duration=360)
+            w.play_entrance(delay_ms=min(idx * 45, 800), duration=340)
 
         # Guard de posicion del scroll arriba
         self._scroll_area.verticalScrollBar().setValue(0)
@@ -687,8 +680,10 @@ class NewsPanel(QFrame):
         self._set_connected()
 
     def _open_item(self, item: NewsItem) -> None:
-        if item.url:
-            webbrowser.open(item.url)
+        """Click en noticia -> pide abrir el lector (news_reader, spec v2)."""
+        items = getattr(self, "_current_items", [])
+        index = items.index(item) if item in items else 0
+        self.readerRequested.emit(list(items), index)
 
     # Eventos de redimension: mantener footer/estado vacio posicionados
     def resizeEvent(self, event) -> None:

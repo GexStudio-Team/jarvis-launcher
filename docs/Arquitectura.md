@@ -53,6 +53,7 @@ flowchart TD
         ui_main["jarvis_ui.py - JarvisUI / BootOverlay / FlashOverlay"]
         cards["mode_card.py - ModeCard<br/>(paint 100% custom, monograma)"]
         np["news_panel.py - NewsPanel / NewsItemWidget / EmptyNewsView"]
+        rd["news_reader.py - NewsReaderView / MiniNewsItem<br/>(lector fullscreen - split-pane)"]
         sd["settings_dialog.py - SettingsDialog / ConnectDialog / GithubDialog"]
     end
 
@@ -64,6 +65,7 @@ flowchart TD
     ui_main --> cards
     ui_main --> np
     ui_main --> sd
+    ui_main --> rd
     ui_main --> fb
     ui_main --> ln
     ui_main --> nt
@@ -71,6 +73,8 @@ flowchart TD
     ui_main --> tr
     ui_main --> gr
     ui_main --> gl
+
+    np -. "readerRequested(items, index)" .-> rd
 
     cfg -.-> config_json["config.json (raíz)"]
     set -.-> settings_json["settings.json (raíz, .gitignore)"]
@@ -248,13 +252,40 @@ flowchart TD
 - Descarga en hilo daemon → entrega al hilo UI vía señal `_itemsFetched`
   (nunca se tocan widgets desde el hilo de trabajo).
 - Refresh automático cada 10 min + botón manual; timer y estados visibles.
-- **Jerarquía limpia v2**: cabecera "¿QUÉ ESTÁ PASANDO EN EL MUNDO AHORA?";
-  cada `NewsItemWidget` muestra fuente + hora en dim, título destacado de 2
-  líneas y preview del resumen (si el feed lo incluye); hover resaltado y
-  **clic abre la noticia** en el navegador.
+- **Anti-saturación**: cada `NewsItemWidget` muestra fuente + hora en dim y
+  título destacado (2 líneas) — **sin preview apilado**; tarjeta de 88 px,
+  spacing 10 y lista limitada a 12 noticias. El resumen y el contenido real
+  viven en el lector (`NewsReaderView`).
+- **Clic emite `readerRequested(items, index)`** para abrir el lector con el
+  mini navegador (`NewsReaderView`).
 - `EmptyNewsView`: estado vacío sobrio ("◉") con botón CONFIG (emite
   `configureRequested` → abre `ConnectDialog`).
-- Ver también: [ADR-005](./ADR-005-panel-noticias-rss.md).
+- Ver también: [ADR-005](./ADR-005-panel-noticias-rss.md),
+  [ADR-007](./ADR-007-lector-noticias.md),
+  [ADR-008](./ADR-008-webengine.md).
+
+### `ui/news_reader.py` — `NewsReaderView` / `MiniBrowser`
+- **Lector de noticias a pantalla completa** (spec v2 pts. 3-4), hijo overlay
+  de `JarvisUI` (mismo patrón que `BootOverlay`): `setGeometry(parent.rect())`
+  + `raise_()`; fade de entrada con `windowOpacity` (ADR-001).
+- **Split-pane redimensionable** (`QSplitter` horizontal, handle estilizado
+  del tema): lista compacta izquierda (`MiniNewsItem`, 180–380 px) + **mini
+  navegador embebido** a la derecha.
+- **Mini navegador (`MiniBrowser`)** — decisión del ADR-008: `QStackedWidget`
+  con `QWebEngineView` (Chromium, PyQt6-WebEngine) **o** `QTextBrowser`
+  (fallback con el resumen del feed). `show_article(item, html)` carga la
+  **URL real del artículo** (imágenes, CSS y contenido completo) en Chromium;
+  sin la dependencia, muestra el HTML de lectura larga v2 (lead con capitular,
+  pull-quote). El módulo se importa en el constructor (try/except, lazy).
+- Encabezado: **← VOLVER**, fuente·hora (con estado "Cargando artículo…"),
+  **⟳** recargar y **ABRIR ORIGINAL ↗** (`webbrowser.open`).
+- Navegación `←`/`→` y `Escape` (señal `closeRequested`); clic en la lista
+  también navega; HTML de respaldo generado con los colores del tema
+  (`set_theme`).
+- `main.py` activa `AA_ShareOpenGLContexts` antes de crear `QApplication`
+  (requisito del WebEngine).
+- Ver también: [ADR-007](./ADR-007-lector-noticias.md),
+  [ADR-008](./ADR-008-webengine.md).
 
 ### `ui/settings_dialog.py` — `SettingsDialog` / `ConnectDialog` / `GithubDialog`
 - `SettingsDialog` (modal, rueda ⚙): **lista estructurada v2** con filas
@@ -288,6 +319,7 @@ sequenceDiagram
     participant C as ConfigManager
     participant S as SettingsManager
     participant N as NewsPanel
+    participant R as NewsReaderView
     participant L as AppLauncher
     participant ST as StateManager
     participant F as feedback
@@ -304,6 +336,13 @@ sequenceDiagram
     W->>W: pinta cards + typewriter (tema activo)
     W->>N: refresh (hilo daemon, señal _itemsFetched)
     N-->>W: items (del hilo de trabajo al hilo UI)
+    U->>N: click en una noticia
+    N-->>W: readerRequested(items, index)
+    W->>R: _open_reader(items, index) → show + fade (fullscreen)
+    R-->>U: lectura larga (lead/pull-quote/cuerpo)
+    U->>R: ← / → cambian articulo; clic en lista
+    U->>R: Escape → closeRequested
+    R-->>W: _close_reader() → hide, vuelve al launcher
     U->>W: hover en tarjeta
     W->>W: halo + zoom (pintado manual)
     U->>W: click / Enter
@@ -312,9 +351,7 @@ sequenceDiagram
     W->>H: hide() tras 700 ms (deja al frente las apps)
     W->>L: launch_mode(modo) [hilo daemon]
     W->>ST: record_mode(id, name)
-    W->>F: play_success() / play_error()
     W->>NT: notify("J.A.R.V.I.S.", resultado)
-    W-->>U: el launcher queda en bandeja (tray enabled)
     U->>H: Ctrl+Shift+Espacio (cualquier app)
     H-->>W: signal activated → toggle_visibility()
     U->>TR: clic/doble clic en icono de bandeja
@@ -354,9 +391,12 @@ Resumen de categorías vigentes (verificado al 2026-09-11):
   offscreen; falta validación interactiva en Windows real (mensaje `WM_HOTKEY`
   y notificaciones de bandeja). Probar sin conflictos con otro proceso usando
   `Ctrl+Shift+Espacio` (el registro fallido se loguea como advertencia).
-- **Lector de noticias v2** (spec puntos 3 y 4): vista a pantalla completa con
-  ancho redimensionable/split, tipografía de lectura larga, lead/pull-quote y
-  hooks — en rama `feat/news-reader` (pendiente).
+- **Lector de noticias v2** (spec puntos 3 y 4): implementado con **mini
+  navegador embebido** (`PyQt6-WebEngine`, o fallback texto) y panel
+  des saturado; validación visual de la navegación real (`setUrl` → contenido
+  cargado) en pantalla de escritorio pendiente.
+- **Dependencias**: `PyQt6-WebEngine` agregado como opcional (ADR-008); en
+  entornos sin GPU Chromium cae a software (warnings). 
 - **Temas**: soporte de tema claro con contraste verificado en todo el paint
   custom; editor visual de paletas.
 - **Noticias**: soporte JSON Feed; caché offline de items; filtro por

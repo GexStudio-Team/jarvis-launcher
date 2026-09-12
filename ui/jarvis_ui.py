@@ -63,6 +63,7 @@ from core.settings import SettingsManager
 from core.tray import Tray
 from ui.mode_card import ModeCard
 from ui.news_panel import NewsPanel
+from ui.news_reader import NewsReaderView
 from ui.settings_dialog import SettingsDialog, ConnectDialog
 
 # ======================================================================
@@ -457,7 +458,11 @@ class JarvisUI(QWidget):
         self._news_panel = NewsPanel(self._settings, self._theme, self)
         self._news_panel.configureRequested.connect(self._open_connect_dialog)
         self._news_panel.widthChanged.connect(self._on_news_width_changed)
+        self._news_panel.readerRequested.connect(self._open_reader)
         self._news_panel.set_initial_width()
+
+        # ---- Lector de articulos (fullscreen, creado bajo demanda) ----
+        self._news_reader: NewsReaderView | None = None
 
         # Insertar segun posicion
         self._apply_news_panel_position()
@@ -627,6 +632,39 @@ class JarvisUI(QWidget):
 
     def _on_news_width_changed(self, value: int) -> None:
         self._settings.news_width = value
+
+    # ------------------------------------------------------------------
+    # Lector de articulos (spec v2 pts. 3-4)
+    # ------------------------------------------------------------------
+
+    def _open_reader(self, items: list, index: int = 0) -> None:
+        """Abre el lector de noticias a pantalla completa sobre el launcher."""
+        if not items:
+            return
+        play_click()
+        if self._news_reader is None:
+            self._news_reader = NewsReaderView(self._theme, self)
+            self._news_reader.closeRequested.connect(self._close_reader)
+        self._news_reader.set_items(items, index)
+        self._news_reader.set_theme(self._theme)
+        self._news_reader.update_position()
+        self._news_reader.show()
+        self._news_reader.raise_()
+        # Fade de entrada con windowOpacity (nativa, ADR-001)
+        fade = QPropertyAnimation(self._news_reader, b"windowOpacity")
+        fade.setDuration(220)
+        fade.setStartValue(0.0)
+        fade.setEndValue(1.0)
+        fade.setEasingCurve(QEasingCurve.Type.OutCubic)
+        fade.start()
+        self._reader_fade = fade
+
+    def _close_reader(self) -> None:
+        """Vuelve del lector al launcher."""
+        if self._news_reader is None:
+            return
+        self._news_reader.hide()
+        self.show_and_raise()
 
     def open_settings(self) -> None:
         """Ruedita de ajustes."""
@@ -1083,6 +1121,10 @@ class JarvisUI(QWidget):
     # ------------------------------------------------------------------
 
     def keyPressEvent(self, event) -> None:
+        # Si el lector esta abierto, sus atajos tienen prioridad
+        if self._news_reader is not None and self._news_reader.isVisible():
+            if self._news_reader.handle_key(event):
+                return
         if event.key() == Qt.Key.Key_Escape:
             self.close()
         elif event.key() == Qt.Key.Key_F11:

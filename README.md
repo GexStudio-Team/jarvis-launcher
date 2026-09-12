@@ -41,24 +41,24 @@ Interfaz tipo JARVIS (Iron Man) que se ejecuta al iniciar Windows y permite lanz
 - **Panel de control estructurado**: lista por secciones (Apariencia,
   Comportamiento, Noticias, Cuenta de GitHub, Próximamente) con auto-inicio y
   bandeja configurables
+- **Lector de noticias con mini navegador**: haz clic en cualquier noticia del
+  panel y se abre a pantalla completa un **navegador embebido con el artículo
+  real** (imágenes, videos y todo el contenido del sitio). Lista lateral para
+  cambiar de artículo al instante, botón **⟳** para recargar y
+  **ABRIR ORIGINAL ↗** para verlo en tu navegador habitual.
+  *El panel lateral se mantiene limpio: fuente, hora y título de cada noticia
+  (sin textos apilados); lo completo se lee en el lector.*
 
 ## Requisitos
 
 - Windows 10/11
 - Python 3.10+
 - PyQt6
-
-## Instalacion
+- PyQt6-WebEngine (para el mini navegador del lector de noticias; **opcional** —
+  sin él, el lector muestra el resumen del artículo en modo texto)
 
 ```bash
-# 1. Navegar al directorio del proyecto
-cd jarvis-launcher
-
-# 2. Instalar dependencias
-pip install -r requirements.txt
-
-# 3. Ejecutar
-python main.py
+pip install -r requirements.txt   # instala PyQt6 y PyQt6-WebEngine
 ```
 
 Para detalles de arquitectura, decisiones técnicas (ADRs) y trabajo pendiente
@@ -196,7 +196,18 @@ Arrastra el **borde interior** del panel (cursor ⇔) para cambiar su ancho
 
 ### Abrir una noticia
 
-Haz clic en cualquier noticia del panel: se abre en tu navegador por defecto.
+Haz clic en cualquier noticia del panel: se abre el **lector de noticias** a
+pantalla completa dentro del launcher.
+
+- A la **izquierda** tienes la lista de noticias: haz clic (o usa `←` / `→`)
+  para cambiar de artículo al instante.
+- A la **derecha** se carga la **noticia completa en un mini navegador
+  embebido** (imágenes, videos, todo el sitio). Usa **⟳** para recargar.
+- Usa **`Escape`** (o el botón **← VOLVER**) para regresar al launcher.
+- Para abrir el artículo en tu navegador habitual, pulsa **ABRIR ORIGINAL ↗**.
+
+> Sin `PyQt6-WebEngine` instalado, el lector muestra el resumen del artículo
+> con tipografía de lectura larga en lugar del mini navegador (mismo flujo).
 
 > Las noticias se actualizan automáticamente cada 10 minutos. Si el panel
 > queda "Sin noticias disponibles", verifica tu conexión o cambia de fuente
@@ -229,7 +240,8 @@ jarvis-launcher/
 ├── ui/
 │   ├── jarvis_ui.py     # Ventana principal con efectos HUD
 │   ├── mode_card.py     # Tarjetas workspace de modo (monograma)
-│   ├── news_panel.py    # Panel lateral de noticias
+│   ├── news_panel.py    # Panel lateral de noticias (limpio, sin previews)
+│   ├── news_reader.py   # Lector fullscreen: mini navegador embebido + lista
 │   └── settings_dialog.py  # Panel de control estructurado + GitHub/Connect
 └── assets/
     ├── startup.vbs      # Script de auto-inicio Windows
